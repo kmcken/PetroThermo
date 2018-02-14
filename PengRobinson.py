@@ -59,7 +59,7 @@ def volume(temp, press, temp_crit, press_crit, acentric_factor):
 
     a1 = b - R * temp / press
     a2 = a / press - 3 * b**2 - (2 * b * R * temp) / press
-    a3 = b**3 * b**2 * R * temp / press - a * b / press
+    a3 = b**3 + b**2 * R * temp / press - a * b / press
 
     vol = qr.cubic_root(a1, a2, a3)
 

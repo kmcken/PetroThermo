@@ -24,7 +24,7 @@ logging.info('{0} START: Starting data analysis.'.format(t))
 length = 1
 print(str(length) + ' m = ' + str(unit.from_si(length, 'ft')) + ' ft.')
 
-print(pr.pressure(400, 1.3685e-4, 369.83, 4.248e6, 0.1523)/1e6)
+print("{:.2e}".format(pr.pressure(400, pr.volume(400, 10e6, 369.83, 4.248e6, 0.1523)[0], 369.83, 4.248e6, 0.1523)))
 print(pr.volume(400, 10e6, 369.83, 4.248e6, 0.1523))
 print(pr.volume(310, 1e6, 369.83, 4.248e6, 0.1523))
 
