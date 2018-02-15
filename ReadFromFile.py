@@ -2,7 +2,6 @@ import datetime
 import logging
 import os
 import sqlite3
-import sys
 
 # LOGGING
 root_path = os.path.dirname(os.path.realpath(__file__))
@@ -60,6 +59,9 @@ def thermo_data(name=None, formula=None, file=None):
 
 def get_phase_change_data(name=None, formula=None, database=None):
     """
+    Gets the phase change data from the .db file for a specific substance.
+    Input name OR formula.
+
     :param name: Substance name
     :type name: str
     :param formula: Substance formula
@@ -104,7 +106,11 @@ def get_phase_change_data(name=None, formula=None, database=None):
 
 
 def get_heat_capacity_constants(name=None, formula=None, database=None):
-    """Heat Capacity Constants for Cp = A + B/1e2 T + C/1e5 T^2 + D/1e9 T^3
+    """
+    Gets the Heat Capacity Constants from the .db file
+    Cp = A + B/1e2 T + C/1e5 T^2 + D/1e9 T^3
+    Input name OR formula.
+
     :param name: Substance name
     :type name: str
     :param formula: Substance formula

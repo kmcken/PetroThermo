@@ -149,10 +149,34 @@ def a_factor(temp, temp_crit, press_crit, acentric_factor):
 
 
 def b_factor(temp_crit, press_crit):
+    """
+    Calculates the b value for Peng-Robinson Equation of State
+
+    :param temp_crit: The substance critical temperature (K)
+    :type temp_crit: float
+    :param press_crit: The substance critical pressure (Pa)
+    :type press_crit: float
+    :return: Value of b
+    :rtype: float
+    """
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
-    b = 0.07779607 * R * temp_crit / press_crit
-    return b
+
+    if press_crit == 0:
+        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
+        logging.error('{0} b_factor: divide by zero error.'.format(t))
+        raise ZeroDivisionError
+
+    return 0.07779607 * R * temp_crit / press_crit
+
 
 
 def kappa(acentric_factor):
+    """
+    Calculates the kappa value for Peng-Robinson Equation of State
+
+    :param acentric_factor: The substance acentric factor (unitless)
+    :type acentric_factor: float
+    :return: Value of kappa
+    :rtype: float
+    """
     return 0.37464 + 1.54226 * acentric_factor - 0.26992 * acentric_factor ** 2
