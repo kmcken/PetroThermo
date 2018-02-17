@@ -65,7 +65,7 @@ def volume(temp, press, temp_crit, press_crit, acentric_factor):
 
     volume = np.array(np.zeros(3))
     for i in range(0, 3):
-        if np.iscomplex(vol[i]):
+        if np.iscomplex(vol[i]) or vol[i].real < b:
             volume[i] = np.nan
         else:
             volume[i] = vol[i].real
@@ -83,7 +83,7 @@ def dPdV(temp, press, temp_crit, press_crit, acentric_factor):
         press_crit: Critical Pressure, Pc (Pa)
         accntric_factor: Acentric factor, omega (unitless)
     Outputs:
-        dpdv: Pressure Derivative with Respect to Volume at Constant Temperature, dP/dV_T (Pa/m^3)
+        dpdv: Pressure Derivative with Respect to Volume at Constant Temperature, dP/dV_T (Pa/(mol-m^3))
     """
     t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
     logging.info('{0} INFO: Calculating volume from the Peng-Robinson Equation of State.'.format(t))
@@ -156,17 +156,17 @@ def b_factor(temp_crit, press_crit):
     :type temp_crit: float
     :param press_crit: The substance critical pressure (Pa)
     :type press_crit: float
-    :return: Value of b
+    :return: Value of b (m**3)
     :rtype: float
     """
-    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+    R = 8.314459848  # Gas Constant: m**3 Pa / (mol K)
 
     if press_crit == 0:
         t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
         logging.error('{0} b_factor: divide by zero error.'.format(t))
         raise ZeroDivisionError
 
-    return 0.07779607 * R * temp_crit / press_crit
+    return 0.077796074 * R * temp_crit / press_crit
 
 
 

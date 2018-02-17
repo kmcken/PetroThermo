@@ -27,36 +27,6 @@ def read_file(file):
     return txt_file
 
 
-def thermo_data(name=None, formula=None, file=None):
-    t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-    logging.info('{0} Getting chemistry data.'.format(t))
-
-    if name is None and formula is None:
-        print('No name or symbol input')
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.warning('{0} No name or symbol input.'.format(t))
-        raise ValueError
-
-    if file is None:
-        file = root_path + '/NISTChemistryData.txt'
-
-    mw, temp_crit, press_crit, temp_triple, press_triple, acentric_factor = None, None, None, None, None, None
-    with open(file, 'r', encoding='utf-8-sig') as f:
-        for line in f:
-            parts = line.split(',')
-            if parts[0] == name:
-                mw, acentric_factor = float(parts[2]), float(parts[7])
-                temp_crit, press_crit = float(parts[3]), float(parts[4])
-                temp_triple, press_triple = float(parts[5]), float(parts[6])
-
-            if parts[1] == formula:
-                mw, acentric_factor = float(parts[2]), float(parts[7])
-                temp_crit, press_crit = float(parts[3]), float(parts[4])
-                temp_triple, press_triple = float(parts[5]), float(parts[6])
-
-    return mw, temp_crit, press_crit, temp_triple, press_triple, acentric_factor
-
-
 def get_phase_change_data(name=None, formula=None, database=None):
     """
     Gets the phase change data from the .db file for a specific substance.
