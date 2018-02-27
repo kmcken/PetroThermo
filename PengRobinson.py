@@ -28,7 +28,6 @@ def departure_H(temp, press, temp_crit, press_crit, acentric_factor):
     :return: Enthalpy Departure Function, Delta H
     :rtype: float
     """
-    alglog.info('Peng-Robinson Enthalpy Departure Function.')
 
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     dadt = dadT(temp, temp_crit, press_crit, acentric_factor)
@@ -36,15 +35,16 @@ def departure_H(temp, press, temp_crit, press_crit, acentric_factor):
     b = b_factor(temp_crit, press_crit)
 
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-    if vol[2] is np.nan:
+    if np.isnan(vol[2]):
         vol = vol[0]
     else:
         vol = vol[2]
 
     Z = press * vol / (R * temp)
+    B = (b * press) / (R * temp)
 
-    dH = R * temp * (Z - 1) - (temp * dadt - a)/(2 * np.sqrt(2) * b) * \
-        np.log((Z + (1 - np.sqrt(2)) * b * press / (R * temp))/(Z + (1 + np.sqrt(2)) * b * press / (R * temp)))
+    dH = R * temp * (Z - 1) - (temp * dadt - a)/(2 * np.sqrt(2) * b) * np.log((Z + (1 - np.sqrt(2)) * B) /
+                                                                              (Z + (1 + np.sqrt(2)) * B))
     return dH
 
 
@@ -65,22 +65,23 @@ def departure_S(temp, press, temp_crit, press_crit, acentric_factor):
     :return: Entropy Departure Function, Delta S
     :rtype: float
     """
-    alglog.info('Peng-Robinson Entropy Departure Function.')
 
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     dadt = dadT(temp, temp_crit, press_crit, acentric_factor)
     b = b_factor(temp_crit, press_crit)
 
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-    if vol[2] is np.nan:
+
+    if np.isnan(vol[2]):
         vol = vol[0]
     else:
         vol = vol[2]
 
     Z = press * vol / (R * temp)
+    B = (b * press) / (R * temp)
 
-    dS = R * temp * (Z - b * press/(R * temp)) - dadt / (2 * np.sqrt(2) * b) * \
-        np.log((Z + (1 - np.sqrt(2)) * b * press / (R * temp)) / (Z + (1 + np.sqrt(2)) * b * press / (R * temp)))
+    dS = R * np.log(Z - B) - dadt / (2 * np.sqrt(2) * b) * np.log((Z + (1 - np.sqrt(2)) * B) /
+                                                                  (Z + (1 + np.sqrt(2)) * B))
     return dS
 
 
@@ -101,7 +102,6 @@ def departure_G(temp, press, temp_crit, press_crit, acentric_factor):
     :return: Gibbs Free-Energy Departure Function, Delta G
     :rtype: float
     """
-    alglog.info('Peng-Robinson Gibbs Free-Energy Departure Function.')
 
     dS = departure_S(temp, press, temp_crit, press_crit, acentric_factor)
     dH = departure_H(temp, press, temp_crit, press_crit, acentric_factor)
@@ -126,10 +126,9 @@ def departure_U(temp, press, temp_crit, press_crit, acentric_factor):
     :return: Internal Energy Departure Function, Delta G
     :rtype: float
     """
-    alglog.info('Peng-Robinson Internal Energy Departure Function.')
 
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-    if vol[2] is np.nan:
+    if np.isnan(vol[2]):
         vol = vol[0]
     else:
         vol = vol[2]
@@ -155,7 +154,6 @@ def departure_A(temp, press, temp_crit, press_crit, acentric_factor):
     :return: Internal Energy Departure Function, Delta G
     :rtype: float
     """
-    alglog.info('Peng-Robinson Helmholtz Free-Energy Departure Function.')
 
     dU = departure_U(temp, press, temp_crit, press_crit, acentric_factor)
     dS = departure_S(temp, press, temp_crit, press_crit, acentric_factor)
@@ -180,7 +178,6 @@ def pressure(temp, vol, temp_crit, press_crit, acentric_factor):
     :return: Pressure, P (Pa)
     :rtype: float
     """
-    alglog.info('Peng-Robinson Pressure.')
 
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     a = a_factor(temp, temp_crit, press_crit, acentric_factor)
@@ -208,7 +205,6 @@ def volume(temp, press, temp_crit, press_crit, acentric_factor):
     :return: Volume, V (m**3)
     :rtype np.array
     """
-    alglog.info('Peng-Robinson Volume.')
 
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     a = a_factor(temp, temp_crit, press_crit, acentric_factor)
@@ -243,8 +239,6 @@ def dPdV(temp, press, temp_crit, press_crit, acentric_factor):
         dpdv: Pressure Derivative with Respect to Volume at Constant Temperature, dP/dV_T (Pa/(mol-m^3))
     """
 
-    alglog.info('Peng-Robinson dP/dV.')
-
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     a = a_factor(temp, temp_crit, press_crit, acentric_factor)
     b = b_factor(temp_crit, press_crit)
@@ -271,8 +265,6 @@ def dPdT(temp, press, temp_crit, press_crit, acentric_factor):
         dpdv: Pressure Derivative with respect to Temperature at constant Volume, dP/dT_V (Pa/K)
     """
 
-    alglog.info('Peng-Robinson dP/dT.')
-
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     b = b_factor(temp_crit, press_crit)
     dadt = dadT(temp, temp_crit, press_crit, acentric_factor)
@@ -285,14 +277,12 @@ def dPdT(temp, press, temp_crit, press_crit, acentric_factor):
 
 
 def dadT(temp, temp_crit, press_crit, acentric_factor):
-    alglog.info('Peng-Robinson da/dT.')
     a = a_factor(temp, temp_crit, press_crit, acentric_factor)
     k = kappa(acentric_factor)
     return - k * a / ((1 + k * (1 - np.sqrt(temp/temp_crit)))*np.sqrt(temp * temp_crit))
 
 
 def ddadT2(temp, temp_crit, press_crit, acentric_factor):
-    alglog.info('Peng-Robinson dda/dT**2.')
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     ac = 0.45723553 * R ** 2 * temp_crit ** 2 / press_crit
     k = kappa(acentric_factor)
@@ -300,7 +290,6 @@ def ddadT2(temp, temp_crit, press_crit, acentric_factor):
 
 
 def a_factor(temp, temp_crit, press_crit, acentric_factor):
-    alglog.info('Peng-Robinson a-factor.')
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     ac = 0.45723553 * R**2 * temp_crit**2 / press_crit
     k = kappa(acentric_factor)
@@ -319,7 +308,6 @@ def b_factor(temp_crit, press_crit):
     :return: Value of b (m**3)
     :rtype: float
     """
-    alglog.info('Peng-Robinson b-factor.')
     R = 8.314459848  # Gas Constant: m**3 Pa / (mol K)
 
     if press_crit == 0:
@@ -339,5 +327,4 @@ def kappa(acentric_factor):
     :return: Value of kappa
     :rtype: float
     """
-    alglog.info('Peng-Robinson kappa.')
     return 0.37464 + 1.54226 * acentric_factor - 0.26992 * acentric_factor ** 2

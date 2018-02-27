@@ -1,13 +1,10 @@
-import datetime
 import logging
 import os
-import sys
 
+import matplotlib.pyplot as plt
 import numpy as np
 import PengRobinson as pr
-import PVT
 import ReadFromFile as read
-import UnitConverter as unit
 
 
 # LOGGING
@@ -34,21 +31,49 @@ alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
 
 runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
-#
-# print("{:.2e}".format(pr.pressure(400, pr.volume(400, 10e6, 369.83, 4.248e6, 0.1523)[0], 369.83, 4.248e6, 0.1523)))
+methane_prop = read.get_phase_change_data('Methane')
+Tc = methane_prop[1]
+Pc = methane_prop[2]
+omega = methane_prop[5]
 
-temperature = unit.to_si(25, 'degC')
-pressure = unit.to_si(14.7, 'psi')
-substance = 'Methane'
-MW, Tc, Pc, Ttrip, Ptrip, Acentric = read.get_phase_change_data(name=substance)
+Pr = np.linspace(0.1, 30, 1000)
+Tr = np.linspace(0.5, 4, 36)
 
+T = Tr * Tc
+P = Pr * Pc
 
-print(pr.volume(temperature, pressure, Tc, Pc, Acentric))
-print(pr.dPdV(temperature, pressure, Tc, Pc, Acentric))
-print('Cp of ' + substance + ': ' + str(np.round(PVT.cp(temperature, substance) / MW, 4)) + ' kJ/(kg-K) at ' + str(np.round(unit.from_si(temperature, 'degF'), 2)) + ' F and ' + str(np.round(unit.from_si(pressure, 'psi'), 2)) + ' psi')
-print('Cv of ' + substance + ': ' + str(np.round(PVT.cv(temperature, pressure, substance) / MW, 4)) + ' kJ/(kg-K) at ' + str(np.round(unit.from_si(temperature, 'degF'), 2)) + ' F and ' + str(np.round(unit.from_si(pressure, 'psi'), 2)) + ' psi')
-print('Speed of Sound in ' + substance + ': ' + str(np.round(PVT.speed_of_sound(temperature,  pressure, substance), 2)) + ' m/s')
+plt.figure()
+DeltaH = list()
+for t in range(0, len(Tr)):
+    print('Tr = ' + str(Tr[t]))
+    for p in range(0, len(Pr)):
+        DeltaH.append(pr.departure_H(T[t], P[p], Tc, Pc, omega)/Tc * -1 /4.184)
 
+    plt.plot(Pr, DeltaH, 'b')
+    DeltaH.clear()
 
-t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-logging.info('{0} END: Target Destroyed.'.format(t))
+plt.grid(b=True, which='major', color='k', linestyle='-', alpha=0.5)
+plt.grid(b=True, which='minor', color='k', linestyle='-', alpha=0.5)
+plt.xscale('log')
+plt.xlabel('Reduced Pressure, Pr')
+plt.ylabel('(H^IG - H)/Tc, cal/mol-K')
+plt.show()
+
+plt.figure()
+DeltaS = list()
+for t in range(0, len(Tr)):
+    print('Tr = ' + str(Tr[t]))
+    for p in range(0, len(Pr)):
+        DeltaS.append(pr.departure_S(T[t], P[p], Tc, Pc, omega) * -1 /4.184)
+
+    plt.plot(Pr, DeltaS, 'b')
+    DeltaS.clear()
+
+plt.grid(b=True, which='major', color='k', linestyle='-', alpha=0.5)
+plt.grid(b=True, which='minor', color='k', linestyle='-', alpha=0.5)
+plt.xscale('log')
+plt.xlabel('Reduced Pressure, Pr')
+plt.ylabel('(S^IG - S), cal/mol-K')
+plt.show()
+
+runlog.info('END Target Destroyed')
