@@ -9,18 +9,30 @@ import PVT
 import ReadFromFile as read
 import UnitConverter as unit
 
-# LOGGING
-root_path = os.path.dirname(os.path.realpath(__file__))
-logging.basicConfig(filename=root_path + '/Logs/run.log', level=logging.DEBUG)
-# Logging Levels:
-# CRITICAL
-# ERROR
-# WARNING
-# INFO
-# DEBUG
 
-t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-logging.info('{0} START: Starting data analysis.'.format(t))
+# LOGGING
+def setup_logger(name, log_file, level=logging.INFO):
+    # Logging Levels:
+    # CRITICAL
+    # ERROR
+    # WARNING
+    # INFO
+    # DEBUG
+
+    handler = logging.FileHandler(log_file)
+    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+    return logger
+
+
+# Setup Log Files
+root_path = os.path.dirname(os.path.realpath(__file__))
+runlog = setup_logger('runlog', root_path + '/Logs/run.log', level=logging.DEBUG)
+alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
+
+runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
 #
 # print("{:.2e}".format(pr.pressure(400, pr.volume(400, 10e6, 369.83, 4.248e6, 0.1523)[0], 369.83, 4.248e6, 0.1523)))
