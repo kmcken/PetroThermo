@@ -302,7 +302,7 @@ def dadT(temp, temp_crit, press_crit, z, w, delta):
     dadt = 0
     for i in range(0, N):
         for j in range(0, N):
-            dadt += 0.5 * z[i] * z[j] * (1 - delta[i][j]) * (np.sqrt(a_vector[j] / a_vector[i]) * dadt_vector[i] +
+            dadt += 0.5 * z[i] * z[j] * (1 - delta[j][i]) * (np.sqrt(a_vector[j] / a_vector[i]) * dadt_vector[i] +
                                                              np.sqrt(a_vector[i] / a_vector[j]) * dadt_vector[j])
 
     return dadt
@@ -346,7 +346,7 @@ def ddadT2(temp, temp_crit, press_crit, z, w, delta):
     ddat2 = 0
     for i in range(0, N):
         for j in range(0, N):
-            ddat2 += 0.5 * 0.5 * z[i] * z[j] * (1 - delta[i][j]) * \
+            ddat2 += 0.5 * 0.5 * z[i] * z[j] * (1 - delta[j][i]) * \
                     (dadt_vector[i] * dadt_vector[j] / np.sqrt(a_vector[i] * a_vector[j]) +
                      ddadt2_vector[i] * np.sqrt(a_vector[j]) / np.sqrt(a_vector[i]) +
                      ddadt2_vector[j] * np.sqrt(a_vector[i]) / np.sqrt(a_vector[j]) -
@@ -384,7 +384,7 @@ def a_factor(temp, temp_crit, press_crit, z, w, delta):
     a = 0
     for i in range(0, N):
         for j in range(0, N):
-            a += w[i] * w[j] * np.sqrt(a_vector[i] * a_vector[j]) * (1 - delta[i][j])
+            a += w[i] * w[j] * np.sqrt(a_vector[i] * a_vector[j]) * (1 - delta[j][i])
 
     return a
 
