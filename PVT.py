@@ -3,7 +3,7 @@ import logging
 import os
 
 import numpy as np
-import PengRobinson as pr
+import SingleComponent as pr
 import ReadFromFile as read
 
 # LOGGING

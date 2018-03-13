@@ -4,7 +4,8 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import PengRobinson as pr
+import SingleComponent as Single
+import MultiComponent as Multi
 import ReadFromFile as read
 
 import UnitConverter as units
@@ -34,11 +35,15 @@ alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
 
 runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
-properties = read.get_phase_change_data('Water')
-Tc = properties[1]
-Pc = properties[2]
-MW = properties[0]
-omega = properties[5]
+Tc = (425.1, 469.7)
+Pc = (units.to_si(37.96, 'bar'), units.to_si(33.7, 'bar'))
+w = (0.2, 0.252)
+z = (0.3563, 0.6437)
+delta = ([0, 0], [0, 0])
+
+print(Multi.a_factor(100, Tc, Pc, z, w, delta))
+print(Multi.b_factor(Tc, Pc, z))
+sys.exit()
 
 Pr = list()
 Hv = list()
@@ -61,7 +66,7 @@ for comp in range(0, 3):
     omega = properties[5]
 
     for i in range(0, len(Tr)):
-        saturation = pr.saturation(Tr[i] * Tc, Tc, Pc, omega)
+        saturation = Single.saturation(Tr[i] * Tc, Tc, Pc, omega)
         Pr_comp.append(saturation[0] / Pc)
         Hv_comp.append(saturation[1] / 1000)
 

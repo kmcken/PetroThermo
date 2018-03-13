@@ -401,30 +401,72 @@ def dPdT(temp, press, temp_crit, press_crit, acentric_factor):
     return dpdt
 
 
-def dadT(temp, temp_crit, press_crit, acentric_factor):
-    a = a_factor(temp, temp_crit, press_crit, acentric_factor)
-    k = kappa(acentric_factor)
+def dadT(temp, temp_crit, press_crit, omega):
+    """
+    Partial derivative of Van der Waals a-value with respect to temperature at constant pressure (da/dT)_P
+
+    :param temp: Absolute Temperature, T (K)
+    :type temp: float
+    :param temp_crit: Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param omega: Acentric Factor (unitless)
+    :type omega: float
+    :return: Van der Waals a-value
+    :rtype: float
+    """
+    a = a_factor(temp, temp_crit, press_crit, omega)
+    k = kappa(omega)
     return - k * a / ((1 + k * (1 - np.sqrt(temp/temp_crit)))*np.sqrt(temp * temp_crit))
 
 
-def ddadT2(temp, temp_crit, press_crit, acentric_factor):
+def ddadT2(temp, temp_crit, press_crit, omega):
+    """
+    Second derivative of Van der Waals a-value with respect to temperature at constant pressure (d**2 a/dT**2)_P
+
+    :param temp: Absolute Temperature, T (K)
+    :type temp: float
+    :param temp_crit: Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param omega: Acentric Factor (unitless)
+    :type omega: float
+    :return: Van der Waals a-value
+    :rtype: float
+    """
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     ac = 0.45723553 * R ** 2 * temp_crit ** 2 / press_crit
-    k = kappa(acentric_factor)
+    k = kappa(omega)
     return ac * k * np.sqrt(temp_crit / temp) * (1 + k) / (2 * temp * temp_crit)
 
 
-def a_factor(temp, temp_crit, press_crit, acentric_factor):
+def a_factor(temp, temp_crit, press_crit, omega):
+    """
+    Calculates the Van der Waals a-value for the Peng-Robinson Equation of State.
+
+    :param temp: Absolute Temperature, T (K)
+    :type temp: float
+    :param temp_crit: Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param omega: Acentric Factor (unitless)
+    :type omega: float
+    :return: Van der Waals a-value
+    :rtype: float
+    """
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
     ac = 0.45723553 * R**2 * temp_crit**2 / press_crit
-    k = kappa(acentric_factor)
+    k = kappa(omega)
     a = ac * (1 + k * (1 - np.sqrt(temp / temp_crit)))**2
     return a
 
 
 def b_factor(temp_crit, press_crit):
     """
-    Calculates the b value for Peng-Robinson Equation of State
+    Calculates the Van der Waals b-value for the Peng-Robinson Equation of State.
 
     :param temp_crit: The substance critical temperature (K)
     :type temp_crit: float
