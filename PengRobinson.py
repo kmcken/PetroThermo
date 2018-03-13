@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 
+import copy
 import numpy as np
 import UnitConverter as unit
 import QRDecomposition as qr
@@ -9,6 +10,119 @@ import QRDecomposition as qr
 root_path = os.path.dirname(os.path.realpath(__file__))
 runlog = logging.getLogger('runlog')
 alglog = logging.getLogger('alglog')
+
+
+def volume_min_G(temp, press, temp_crit, press_crit, acentric_factor):
+    """
+    Volume and Z-factor for the minimum Gibb's Free Energy solution.
+
+    :param temp: Current Temperature, T (K)
+    :type temp: float
+    :param press: Current Pressure, P (Pa)
+    :type press: float
+    :param temp_crit: Substance Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Substance Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param acentric_factor: Acentric Factor, omega (unitless)
+    :type acentric_factor: float
+    :return: Volume and Z-factor, [V, Z]
+    :rtype: [float, float]
+    """
+
+    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+    a = a_factor(temp, temp_crit, press_crit, acentric_factor)
+    b = b_factor(temp_crit, press_crit)
+    vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
+    Z = list()
+
+    if np.isnan(vol[2]):
+        return vol[0], press * vol[0] / (R * temp), None
+
+    Z.append(press * vol[0] / (R * temp))
+    Z.append(press * vol[2] / (R * temp))
+
+    G = list()
+    G.append(press * vol[0] - R * temp * np.log(vol[0] - b) + a / (2 * b * np.sqrt(2)) *
+             np.log((vol[0] + b * (1 - np.sqrt(2))) /
+                    (vol[0] + b * (1 + np.sqrt(2)))))
+
+    G.append(press * vol[2] - R * temp * np.log(vol[2] - b) + a / (2 * b * np.sqrt(2)) *
+             np.log((vol[2] + b * (1 - np.sqrt(2))) /
+                    (vol[2] + b * (1 + np.sqrt(2)))))
+
+    if G[1] - G[0] > 0:  # Liquid
+        return vol[0], Z[0], 1
+
+    if G[1] - G[0] < 0:  # Gas
+        return vol[2], Z[1], 3
+
+    # Liquid and Gas
+    return [vol[0], vol[2]], Z, np.nan
+
+
+def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=0.001):
+    """
+    Saturation Vapor Pressure and Enthalpy of Vaporization of a pure substance at given a temperature.
+
+    :param temp: Current Temperature, T (K)
+    :type temp: float
+    :param temp_crit: Substance Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Substance Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param acentric_factor: Acentric Factor, omega (unitless)
+    :type acentric_factor: float
+    :param tolerance: Saturation Pressure iteration tolerance (Pa)
+    :type tolerance: float
+    :return: Saturation Vapor Pressure, Ps, and Enthalpy of Vaporization, Hv, [P_sat, H_v]
+    :rtype: [float, float]
+    """
+
+    if temp >= temp_crit:
+        return np.nan, np.nan
+
+    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+    a = a_factor(temp, temp_crit, press_crit, acentric_factor)
+    b = b_factor(temp_crit, press_crit)
+    dadt = dadT(temp, temp_crit, press_crit, acentric_factor)
+
+    # Find Saturation Pressure, P_sat
+    i = 0
+    P_sat = 0.5 * press_crit
+    P_sat_prev = 0
+    p_limits = [0, press_crit]
+    stable = volume_min_G(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
+
+    while stable is not np.nan:
+        delta_P_sat = np.abs(P_sat - P_sat_prev)
+        if delta_P_sat < tolerance:
+            break
+
+        P_sat_prev = copy.copy(P_sat)
+        if stable is None:
+            p_limits[1] = copy.copy(P_sat)
+            P_sat = P_sat - 0.5 * (p_limits[1] - p_limits[0])
+        else:
+            if stable == 1:
+                p_limits[1] = copy.copy(P_sat)
+                P_sat = P_sat - 0.5 * (p_limits[1] - p_limits[0])
+            else:
+                p_limits[0] = copy.copy(P_sat)
+                P_sat = P_sat + 0.5 * (p_limits[1] - p_limits[0])
+
+        stable = volume_min_G(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
+        i += 1
+
+    vol = volume(temp, P_sat, temp_crit, press_crit, acentric_factor)
+    H_v = list()
+    H_v.append(temp * R * np.log(vol[0] - b) + temp * dadt / (2 * b * np.sqrt(2)) *
+               np.log((vol[0] + b * (1 - np.sqrt(2))) /
+                      (vol[0] + b * (1 + np.sqrt(2)))))
+    H_v.append(temp * R * np.log(vol[2] - b) + temp * dadt / (2 * b * np.sqrt(2)) *
+               np.log((vol[2] + b * (1 - np.sqrt(2))) /
+                      (vol[2] + b * (1 + np.sqrt(2)))))
+    return P_sat, H_v[1] - H_v[0]
 
 
 def departure_H(temp, press, temp_crit, press_crit, acentric_factor):
@@ -194,8 +308,8 @@ def volume(temp, press, temp_crit, press_crit, acentric_factor):
 
     :param temp: Current Temperature, T (K)
     :type temp: float
-    :param pressure: Current Pressure, P (Pa)
-    :type pressure: float
+    :param press: Current Pressure, P (Pa)
+    :type press: float
     :param temp_crit: Substance Critical Temperature, Tc (K)
     :type temp_crit: float
     :param press_crit: Substance Critical Pressure, Pc (Pa)
@@ -229,14 +343,19 @@ def volume(temp, press, temp_crit, press_crit, acentric_factor):
 
 def dPdV(temp, press, temp_crit, press_crit, acentric_factor):
     """dP/dV_T from Peng-Robinson Equation of State
-    Inputs:
-        temp: Temperature, T (K)
-        press: Pressure, P (Pa)
-        temp_crit: Critical Temperature, Tc (K)
-        press_crit: Critical Pressure, Pc (Pa)
-        accntric_factor: Acentric factor, omega (unitless)
-    Outputs:
-        dpdv: Pressure Derivative with Respect to Volume at Constant Temperature, dP/dV_T (Pa/(mol-m^3))
+
+    :param temp: Current Temperature, T (K)
+    :type temp: float
+    :param press: Current Pressure, P (Pa)
+    :type press: float
+    :param temp_crit: Substance Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Substance Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param acentric_factor: Acentric Factor, omega (unitless)
+    :type acentric_factor: float
+    :return: Pressure Derivative with Respect to Volume at Constant Temperature, (dP/dV)_T (Pa/(mol-m^3))
+    :rtype np.array
     """
 
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
@@ -254,15 +373,21 @@ def dPdV(temp, press, temp_crit, press_crit, acentric_factor):
 
 
 def dPdT(temp, press, temp_crit, press_crit, acentric_factor):
-    """dP/dT_V from Peng-Robinson Equation of State
-    Inputs:
-        temp: Temperature, T (K)
-        press: Pressure, P (Pa)
-        temp_crit: Critical Temperature, Tc (K)
-        press_crit: Critical Pressure, Pc (Pa)
-        accntric_factor: Acentric factor, omega (unitless)
-    Outputs:
-        dpdv: Pressure Derivative with respect to Temperature at constant Volume, dP/dT_V (Pa/K)
+    """
+    dP/dT_V from Peng-Robinson Equation of State
+
+    :param temp: Current Temperature, T (K)
+    :type temp: float
+    :param press: Current Pressure, P (Pa)
+    :type press: float
+    :param temp_crit: Substance Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Substance Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param acentric_factor: Acentric Factor, omega (unitless)
+    :type acentric_factor: float
+    :return: Pressure Derivative with respect to Temperature at constant Volume, (dP/dT)_V (Pa/K)
+    :rtype np.array
     """
 
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
