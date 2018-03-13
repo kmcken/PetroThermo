@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 
@@ -478,8 +477,7 @@ def b_factor(temp_crit, press_crit):
     R = 8.314459848  # Gas Constant: m**3 Pa / (mol K)
 
     if press_crit == 0:
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.error('{0} b_factor: divide by zero error.'.format(t))
+        alglog.error('b_factor: divide by zero error.')
         raise ZeroDivisionError
 
     return 0.077796074 * R * temp_crit / press_crit

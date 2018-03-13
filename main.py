@@ -43,6 +43,19 @@ delta = ([0, 0], [0, 0])
 
 print(Multi.a_factor(100, Tc, Pc, z, w, delta))
 print(Multi.b_factor(Tc, Pc, z))
+
+poles = np.array([-1, 1.2, 1.5, 2, 3])
+print((np.extract(poles < 1, poles) > 0).any())
+print((poles < 0).any())
+if not (poles < 0).any() or not (poles > 1).any():
+    print('No solution')
+
+print(np.min(np.extract(poles > 1, poles)))
+print(np.max(np.extract(poles < 0, poles)))
+print([np.max(np.extract(poles < 0, poles)), np.min(np.extract(poles > 1, poles))])
+print(np.where(poles > 1)[0])
+print(np.extract(poles > 1, poles))
+
 sys.exit()
 
 Pr = list()

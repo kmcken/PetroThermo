@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 
@@ -13,118 +12,91 @@ runlog = logging.getLogger('runlog')
 alglog = logging.getLogger('alglog')
 
 
-def volume_min_G(temp, press, temp_crit, press_crit, acentric_factor):
+def RachfordRice(z, K):
     """
-    Volume and Z-factor for the minimum Gibb's Free Energy solution.
+    Rachford-Rice equation
+    :param z: Vector of the composition of the mixture (unitless)
+    :param K: Vector that contains the composition of the mixture (unitless)
+    :return: Vector of the liquid composition, x (unitless)
+    :return: Vector of the gas compositiion, y (unitless)
+    :return: Scalar of the liquid fraction (unitless)
+    :return: x, y, nL
+    """
+    N = len(z)
+    if len(K) is not N:
+        raise ValueError('Size of inputs do not agree.')
+
+    poles = np.array(np.zeros(N))
+    for i in range(0, len(K)):
+        poles[i] = (-K[i]/(1-K[i]))
+
+    # Check if solution exists
+    if (np.extract(poles < 1, poles) > 0).any():
+        print('Pole between 0 and 1')
+    if not (poles < 0).any() or not (poles > 1).any():
+        raise ValueError('No solution along the nL[0, 1] interval.')
+
+    def rr_f(z, k, n_L, n):
+        f = 0
+        for i in range(0, n):
+            f += z[i] * (1 - k[i]) / (n_L + k[i] * (1 - n_L))
+        return f
+
+    nL_bounds = [np.max(np.extract(poles < 0, poles)), np.min(np.extract(poles > 1, poles))]
+    nL = (nL_bounds[1] - nL_bounds[0]) / 2 + nL_bounds[0]
+    fnL = rr_f(z, K, nL, N)
+
+    while not np.round(fnL, 4) == 0:
+        if fnL > 0:
+            nL_bounds[0] = copy.copy(nL)
+        if fnL < 0:
+            nL_bounds[1] = copy.copy(nL)
+
+        nL = (nL_bounds[1] - nL_bounds[0]) / 2 + nL_bounds[0]
+        fnL = rr_f(z, K, nL, N)
+
+    x, y = list(), list()
+    for i in range(0, N):
+        x.append(z[i] / (nL + K[i] * (1 - nL)))
+        y.append(z[i] * K[i] / (nL + K[i] * (1 - nL)))
+
+    return x, y, nL
+
+
+def flash(temp, press, z, temp_crit, press_crit, w, delta):
+    """
+    Multicomponent flash calculation for the Peng-Robinson Equation of State.
 
     :param temp: Current Temperature, T (K)
     :type temp: float
     :param press: Current Pressure, P (Pa)
     :type press: float
-    :param temp_crit: Substance Critical Temperature, Tc (K)
-    :type temp_crit: float
-    :param press_crit: Substance Critical Pressure, Pc (Pa)
-    :type press_crit: float
-    :param acentric_factor: Acentric Factor, omega (unitless)
-    :type acentric_factor: float
-    :return: Volume and Z-factor, [V, Z]
-    :rtype: [float, float]
+    :param z: Vector that contains the composition of the mixture (unitless)
+    :param temp_crit: Vector of Critical Temperature, Tc (K)
+    :param press_crit: Vector of Critical Pressure, Pc (Pa)
+    :param w: Vector of Acentric Factor, omega (unitless)
+    :param delta: Square matrix containing the binary interaction coefficients
+    :return: Vector containing the liquid composition by component, x
+    :return: Vector containing the gas composition by component, y
+    :return: Molar specific volume of the liquid, VL
+    :return: Molar specific volume of the gas, VG
+    :return: Liquid Fraction, nL
     """
 
-    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
-    a = a_factor(temp, temp_crit, press_crit, acentric_factor)
-    b = b_factor(temp_crit, press_crit)
-    vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-    Z = list()
+    N = len(temp_crit)
+    if len(press_crit) and len(z) and len(w) and len(delta) is not N:
+        raise ValueError('Size of inputs do not agree.')
 
-    if np.isnan(vol[2]):
-        return vol[0], press * vol[0] / (R * temp), None
+    K = np.array(np.ones(N) * 0.5)[0]
 
-    Z.append(press * vol[0] / (R * temp))
-    Z.append(press * vol[2] / (R * temp))
+    try:
+        x, y, nL = RachfordRice(z, K)
+    except ValueError:
+        alglog.info('No solution along the nL[0, 1] interval.')
+        raise ValueError('No solution along the nL[0, 1] interval.')
 
-    G = list()
-    G.append(press * vol[0] - R * temp * np.log(vol[0] - b) + a / (2 * b * np.sqrt(2)) *
-             np.log((vol[0] + b * (1 - np.sqrt(2))) /
-                    (vol[0] + b * (1 + np.sqrt(2)))))
-
-    G.append(press * vol[2] - R * temp * np.log(vol[2] - b) + a / (2 * b * np.sqrt(2)) *
-             np.log((vol[2] + b * (1 - np.sqrt(2))) /
-                    (vol[2] + b * (1 + np.sqrt(2)))))
-
-    if G[1] - G[0] > 0:  # Liquid
-        return vol[0], Z[0], 1
-
-    if G[1] - G[0] < 0:  # Gas
-        return vol[2], Z[1], 3
-
-    # Liquid and Gas
-    return [vol[0], vol[2]], Z, np.nan
-
-
-def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=0.001):
-    """
-    Saturation Vapor Pressure and Enthalpy of Vaporization of a pure substance at given a temperature.
-
-    :param temp: Current Temperature, T (K)
-    :type temp: float
-    :param temp_crit: Substance Critical Temperature, Tc (K)
-    :type temp_crit: float
-    :param press_crit: Substance Critical Pressure, Pc (Pa)
-    :type press_crit: float
-    :param acentric_factor: Acentric Factor, omega (unitless)
-    :type acentric_factor: float
-    :param tolerance: Saturation Pressure iteration tolerance (Pa)
-    :type tolerance: float
-    :return: Saturation Vapor Pressure, Ps, and Enthalpy of Vaporization, Hv, [P_sat, H_v]
-    :rtype: [float, float]
-    """
-
-    if temp >= temp_crit:
-        return np.nan, np.nan
-
-    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
-    a = a_factor(temp, temp_crit, press_crit, acentric_factor)
-    b = b_factor(temp_crit, press_crit)
-    dadt = dadT(temp, temp_crit, press_crit, acentric_factor)
-
-    # Find Saturation Pressure, P_sat
-    i = 0
-    P_sat = 0.5 * press_crit
-    P_sat_prev = 0
-    p_limits = [0, press_crit]
-    stable = volume_min_G(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
-
-    while stable is not np.nan:
-        delta_P_sat = np.abs(P_sat - P_sat_prev)
-        if delta_P_sat < tolerance:
-            break
-
-        P_sat_prev = copy.copy(P_sat)
-        if stable is None:
-            p_limits[1] = copy.copy(P_sat)
-            P_sat = P_sat - 0.5 * (p_limits[1] - p_limits[0])
-        else:
-            if stable == 1:
-                p_limits[1] = copy.copy(P_sat)
-                P_sat = P_sat - 0.5 * (p_limits[1] - p_limits[0])
-            else:
-                p_limits[0] = copy.copy(P_sat)
-                P_sat = P_sat + 0.5 * (p_limits[1] - p_limits[0])
-
-        stable = volume_min_G(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
-        i += 1
-
-    vol = volume(temp, P_sat, temp_crit, press_crit, acentric_factor)
-    H_v = list()
-    H_v.append(temp * R * np.log(vol[0] - b) + temp * dadt / (2 * b * np.sqrt(2)) *
-               np.log((vol[0] + b * (1 - np.sqrt(2))) /
-                      (vol[0] + b * (1 + np.sqrt(2)))))
-    H_v.append(temp * R * np.log(vol[2] - b) + temp * dadt / (2 * b * np.sqrt(2)) *
-               np.log((vol[2] + b * (1 - np.sqrt(2))) /
-                      (vol[2] + b * (1 + np.sqrt(2)))))
-    return P_sat, H_v[1] - H_v[0]
-
+    x, y, VL, VG, nL = None, None, None, None, None
+    return x, y, VL, VG, nL
 
 
 def pressure(temp, vol, z, temp_crit, press_crit, w, delta):
@@ -134,15 +106,10 @@ def pressure(temp, vol, z, temp_crit, press_crit, w, delta):
     :param temp: Current Temperature, T (K)
     :type temp: float
     :param vol: Current Volume, P (Pa)
-    :type vol: ()
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param w: Vector of Acentric Factor, omega (unitless)
-    :type w: ()
     :param delta: Square matrix containing the binary interaction coefficients
     :return: Pressure, P (Pa)
     :rtype: float
@@ -166,13 +133,9 @@ def volume(temp, press, z, temp_crit, press_crit, w, delta):
     :param press: Current Pressure, P (Pa)
     :type press: float
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param w: Vector of Acentric Factor, omega (unitless)
-    :type w: ()
     :param delta: Square matrix containing the binary interaction coefficients
     :return: Volume, vol (m**3)
     :rtype np.array
@@ -209,13 +172,9 @@ def dPdV(temp, press, z, temp_crit, press_crit, w, delta):
     :param press: Current Pressure, P (Pa)
     :type press: float
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param w: Vector of Acentric Factor, omega (unitless)
-    :type w: ()
     :param delta: Square matrix containing the binary interaction coefficients
     :return: Pressure Derivative with Respect to Volume at Constant Temperature, (dP/dV)_T (Pa/(mol-m^3))
     :rtype np.array
@@ -245,13 +204,9 @@ def dPdT(temp, press, temp_crit, press_crit, z, w, delta):
     :param press: Current Pressure, P (Pa)
     :type press: float
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :param w: Vector of Acentric Factor, omega (unitless)
-    :type w: ()
     :param delta: Square matrix containing the binary interaction coefficients
     :return: Pressure Derivative with respect to Temperature at constant Volume, (dP/dT)_V (Pa/K)
     :rtype np.array
@@ -275,13 +230,9 @@ def dadT(temp, temp_crit, press_crit, z, w, delta):
     :param temp: Current Temperature, T (K)
     :type temp: float
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :param w: Vector of Acentric Factor, omega (unitless)
-    :type w: ()
     :param delta: Square matrix containing the binary interaction coefficients
     :return: dadT, (da/dT)_P
     :rtype float
@@ -315,13 +266,9 @@ def ddadT2(temp, temp_crit, press_crit, z, w, delta):
     :param temp: Current Temperature, T (K)
     :type temp: float
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :param w: Vector of Acentric Factor, omega (unitless)
-    :type w: ()
     :param delta: Square matrix containing the binary interaction coefficients
     :return: ddadT2, (d**2 a/dT**2)_P
     :rtype float
@@ -361,13 +308,9 @@ def a_factor(temp, temp_crit, press_crit, z, w, delta):
     :param temp: Current Temperature, T (K)
     :type temp: float
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :param w: Vector of Acentric Factor, omega (unitless)
-    :type w: ()
     :param delta: Square matrix containing the binary interaction coefficients
     :return: a-value
     :rtype float
@@ -394,11 +337,8 @@ def b_factor(temp_crit, press_crit, z):
     Calculates the Van der Waals b-value of a multicomponent mixture for the Peng-Robinson Equation of State.
 
     :param temp_crit: Vector of Critical Temperature, Tc (K)
-    :type temp_crit: ()
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
-    :type press_crit: ()
     :param z: Vector that contains the composition of the mixture (unitless)
-    :type z: ()
     :return: Value of b (m**3)
     :rtype: float
     """
