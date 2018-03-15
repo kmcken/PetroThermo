@@ -1,22 +1,15 @@
-import datetime
 import logging
 import os
 import sqlite3
 
-# LOGGING
+
 root_path = os.path.dirname(os.path.realpath(__file__))
-logging.basicConfig(filename=root_path + '/Logs/run.log', level=logging.DEBUG)
-# Logging Levels:
-# CRITICAL
-# ERROR
-# WARNING
-# INFO
-# DEBUG
+runlog = logging.getLogger('runlog')
+alglog = logging.getLogger('alglog')
 
 
 def read_file(file):
-    t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-    logging.info('{0} Read from {1} file.'.format(t, file))
+    runlog.info('Read from {0} file.'.format(file))
 
     txt_file = list()
     f = open(file, 'r', encoding='utf-8-sig')
@@ -41,16 +34,15 @@ def get_phase_change_data(name=None, formula=None, database=None):
     :return: [MW, Tc, Pc, Ttrip, Ptrip, Acentric]: Phase Change
     :rtype: [MW, Tc, Pc, Ttrip, Ptrip, Acentric]: float
     """
-    t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-    logging.info('{0} Getting heat capacity constants.'.format(t))
 
     if name is None and formula is None:
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.error('{0} Chemistry Database Query: No name or formula input.'.format(t))
-        raise ValueError
+        runlog.error('PHASE CHANGE: No chemical name or formula input.')
+        raise ValueError('PHASE CHANGE: No chemical name or formula input.')
 
     if database is None:
         database = root_path + '/ChemistryData.db'
+
+    runlog.info('PHASE CHANGE: Read data from {0} file.'.format(database))
 
     try:
         (cursor, conn) = open_database(database)
@@ -67,10 +59,9 @@ def get_phase_change_data(name=None, formula=None, database=None):
     close_database(cursor, conn)
 
     if not constants:
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.error('{0} Chemistry Database Query: Missing substance input.'.format(t))
-        print('Chemistry Database Query: Missing substance input')
-        raise ValueError
+        runlog.error('PHASE CHANGE: Missing data for the requested chemical.')
+        print('PHASE CHANGE: Missing data for the requested chemical.')
+        raise ValueError('PHASE CHANGE: Missing data for the requested chemical.')
 
     return constants[0]
 
@@ -90,16 +81,15 @@ def get_heat_capacity_constants(name=None, formula=None, database=None):
     :return: [A, B, C, D]: Heat Capacity Constants
     :rtype: [A, B, C, D]: float
     """
-    t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-    logging.info('{0} Getting heat capacity constants.'.format(t))
 
     if name is None and formula is None:
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.error('{0} Heat Capacity Database Query: No name or formula input.'.format(t))
-        raise ValueError
+        runlog.error('HEAT CAPACITY: No chemical name or formula input.')
+        raise ValueError('HEAT CAPACITY: No chemical name or formula input.')
 
     if database is None:
         database = root_path + '/ChemistryData.db'
+
+    runlog.info('HEAT CAPACITY: Read data from {0} file.'.format(database))
 
     try:
         (cursor, conn) = open_database(database)
@@ -118,37 +108,31 @@ def get_heat_capacity_constants(name=None, formula=None, database=None):
     close_database(cursor, conn)
 
     if not constants:
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.error('{0} Heat Capacity Database Query: Missing substance input.'.format(t))
-        print('Heat Capacity Database Query: Missing substance input')
-        raise ValueError
+        runlog.error('HEAT CAPACITY: Missing data for the requested chemical.')
+        print('HEAT CAPACITY: Missing data for the requested chemical.')
+        raise ValueError('HEAT CAPACITY: Missing data for the requested chemical.')
 
     return constants[0]
 
 
 def open_database(file=None):
-    t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-    logging.info('{0} DATABASE: Opening {1} database.'.format(t, file))
-
     if file is None:
-        logging.error('{0} Missing database file input.'.format(t))
-        raise FileNotFoundError
+        runlog.error('DATABASE: Missing file input.')
+        raise FileNotFoundError('DATABASE: Missing file input.')
 
+    runlog.info('DATABASE: Opening {0} database.'.format(file))
     try:
         conn = sqlite3.connect(file)
     except sqlite3.InterfaceError:
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.error('{0} Interface error with file {1}.'.format(t, file))
+        runlog.error('DATABASE: Database interface error.')
         raise sqlite3.InterfaceError
     else:
         cursor = conn.cursor()
-        t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
-        logging.info('{0} Database opened'.format(t))
+        runlog.info('DATABASE: Database {0} opened.'.format(file))
         return cursor, conn
 
 
 def close_database(cursor, conn):
-    t = '{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
     cursor.close()
     conn.close()
-    logging.info('{0} Closed database.'.format(t))
+    runlog.info('DATABASE: Database closed.')
