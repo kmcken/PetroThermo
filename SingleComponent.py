@@ -1,8 +1,10 @@
 import logging
 import os
+import sys
 
 import copy
 import numpy as np
+import scipy.optimize as optimize
 import UnitConverter as unit
 import QRDecomposition as qr
 
@@ -60,6 +62,75 @@ def volume_min_G(temp, press, temp_crit, press_crit, acentric_factor):
     return [vol[0], vol[2]], Z, np.nan
 
 
+def spinodal_pts(temp, temp_crit, press_crit, acentric_factor):
+    """
+    Finds the spinodal points from the Peng-Robinson Equation of State when T <= T_c
+
+    :param temp: Current Temperature, T (K)
+    :type temp: float
+    :param temp_crit: Substance Critical Temperature, Tc (K)
+    :type temp_crit: float
+    :param press_crit: Substance Critical Pressure, Pc (Pa)
+    :type press_crit: float
+    :param acentric_factor: Acentric Factor, omega (unitless)
+    :type acentric_factor: float
+    :return: Two Spinodal Points [[V1, P1], [V2, P2]]
+    """
+
+    if temp >= temp_crit:
+        return np.nan, np.nan
+
+    a = a_factor(temp, temp_crit, press_crit, acentric_factor)
+    b = b_factor(temp_crit, press_crit)
+
+    def dpdv_fun(vol):
+        R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+        return - R * temp / (vol - b) ** 2 + 2 * a * (vol + b) / (vol ** 2 + 2 * b * vol - b ** 2) ** 2
+
+    def ddpdv2_fun(vol):
+        R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+        return 2 * R * temp / (vol - b) ** 3 - 4 * a * (2 * b + 1) / (vol ** 2 + 2 * b * vol - b ** 2) ** 3
+
+    roots = list()
+    v_inc = b
+    vol = b + 1e-10
+    v_limits = [b, np.inf]
+
+    dpdv = dpdv_fun(vol)
+    while abs(dpdv) > 1:
+        while dpdv < 0:
+            vol += v_inc
+            dpdv = dpdv_fun(vol)
+        v_inc = 0.5 * v_inc
+
+        while dpdv > 0:
+            vol -= v_inc
+            dpdv = dpdv_fun(vol)
+        v_inc = 0.5 * v_inc
+    roots.append(vol)
+
+    v_limits[0] = vol
+    press = pressure(temp, vol, temp_crit, press_crit, acentric_factor)
+    v_limits[1] = volume(temp, press, temp_crit, press_crit, acentric_factor)[2]
+
+    vol = v_limits[1]
+    v_inc = b
+    dpdv = dpdv_fun(vol)
+    while abs(dpdv) > 1:
+        while dpdv < 0:
+            vol -= v_inc
+            dpdv = dpdv_fun(vol)
+        v_inc = 0.5 * v_inc
+
+        while dpdv > 0:
+            vol += v_inc
+            dpdv = dpdv_fun(vol)
+        v_inc = 0.5 * v_inc
+
+    roots.append(vol)
+    return roots
+
+
 def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=0.001):
     """
     Saturation Vapor Pressure and Enthalpy of Vaporization of a pure substance at given a temperature.
@@ -90,7 +161,8 @@ def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=0.001):
     i = 0
     P_sat = 0.5 * press_crit
     P_sat_prev = 0
-    p_limits = [0, press_crit]
+    spinodal = spinodal_pts(temp, temp_crit, press_crit, acentric_factor)
+    p_limits = [spinodal[0], spinodal[1]]
     stable = volume_min_G(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
 
     while stable is not np.nan:
@@ -240,6 +312,8 @@ def departure_U(temp, press, temp_crit, press_crit, acentric_factor):
     :rtype: float
     """
 
+    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
     if np.isnan(vol[2]):
         vol = vol[0]
@@ -247,7 +321,7 @@ def departure_U(temp, press, temp_crit, press_crit, acentric_factor):
         vol = vol[2]
     dH = departure_H(temp, press, temp_crit, press_crit, acentric_factor)
 
-    return dH - press * vol
+    return dH - press * vol + R * temp
 
 
 def departure_A(temp, press, temp_crit, press_crit, acentric_factor):
@@ -268,10 +342,17 @@ def departure_A(temp, press, temp_crit, press_crit, acentric_factor):
     :rtype: float
     """
 
-    dU = departure_U(temp, press, temp_crit, press_crit, acentric_factor)
+    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+    dH = departure_H(temp, press, temp_crit, press_crit, acentric_factor)
     dS = departure_S(temp, press, temp_crit, press_crit, acentric_factor)
 
-    return dU - temp * dS
+    vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
+    if np.isnan(vol[2]):
+        vol = vol[0]
+    else:
+        vol = vol[2]
+
+    return dH - temp * dS - press * vol + R * temp
 
 
 def pressure(temp, vol, temp_crit, press_crit, acentric_factor):
