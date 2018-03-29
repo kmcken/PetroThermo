@@ -13,7 +13,7 @@ runlog = logging.getLogger('runlog')
 alglog = logging.getLogger('alglog')
 
 
-def volume_min_G(temp, press, temp_crit, press_crit, acentric_factor):
+def min_gibbs_volume(temp, press, temp_crit, press_crit, acentric_factor):
     """
     Volume and Z-factor for the minimum Gibb's Free Energy solution.
 
@@ -89,49 +89,16 @@ def spinodal_pts(temp, temp_crit, press_crit, acentric_factor):
 
     def ddpdv2_fun(vol):
         R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
-        return 2 * R * temp / (vol - b) ** 3 - 4 * a * (2 * b + 1) / (vol ** 2 + 2 * b * vol - b ** 2) ** 3
+        return 2 * R * temp * (vol ** 2 + 2 * b * vol - b ** 2) ** 3 - 4 * a * (2 * b + 1) * (vol - b) ** 3
 
     roots = list()
-    v_inc = b
-    vol = b + 1e-10
-    v_limits = [b, np.inf]
+    roots.append(optimize.root(dpdv_fun, b + 1e-5).x[0])
+    roots.append(optimize.root(dpdv_fun, roots[0] * 10).x[0])
 
-    dpdv = dpdv_fun(vol)
-    while abs(dpdv) > 1:
-        while dpdv < 0:
-            vol += v_inc
-            dpdv = dpdv_fun(vol)
-        v_inc = 0.5 * v_inc
-
-        while dpdv > 0:
-            vol -= v_inc
-            dpdv = dpdv_fun(vol)
-        v_inc = 0.5 * v_inc
-    roots.append(vol)
-
-    v_limits[0] = vol
-    press = pressure(temp, vol, temp_crit, press_crit, acentric_factor)
-    v_limits[1] = volume(temp, press, temp_crit, press_crit, acentric_factor)[2]
-
-    vol = v_limits[1]
-    v_inc = b
-    dpdv = dpdv_fun(vol)
-    while abs(dpdv) > 1:
-        while dpdv < 0:
-            vol -= v_inc
-            dpdv = dpdv_fun(vol)
-        v_inc = 0.5 * v_inc
-
-        while dpdv > 0:
-            vol += v_inc
-            dpdv = dpdv_fun(vol)
-        v_inc = 0.5 * v_inc
-
-    roots.append(vol)
     return roots
 
 
-def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=0.001):
+def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=1e-8):
     """
     Saturation Vapor Pressure and Enthalpy of Vaporization of a pure substance at given a temperature.
 
@@ -159,11 +126,17 @@ def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=0.001):
 
     # Find Saturation Pressure, P_sat
     i = 0
-    P_sat = 0.5 * press_crit
     P_sat_prev = 0
-    spinodal = spinodal_pts(temp, temp_crit, press_crit, acentric_factor)
-    p_limits = [spinodal[0], spinodal[1]]
-    stable = volume_min_G(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
+    spinodal_vol = spinodal_pts(temp, temp_crit, press_crit, acentric_factor)
+    spinodal_press = [pressure(temp, spinodal_vol[0], temp_crit, press_crit, acentric_factor),
+                      pressure(temp, spinodal_vol[1], temp_crit, press_crit, acentric_factor)]
+    P_sat = press_crit
+    for i in range(0, 2):
+        if spinodal_press[i] < 0:
+            spinodal_press[i] = 0
+
+    p_limits = spinodal_press
+    stable = min_gibbs_volume(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
 
     while stable is not np.nan:
         delta_P_sat = np.abs(P_sat - P_sat_prev)
@@ -182,7 +155,7 @@ def saturation(temp, temp_crit, press_crit, acentric_factor, tolerance=0.001):
                 p_limits[0] = copy.copy(P_sat)
                 P_sat = P_sat + 0.5 * (p_limits[1] - p_limits[0])
 
-        stable = volume_min_G(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
+        stable = min_gibbs_volume(temp, P_sat, temp_crit, press_crit, acentric_factor)[2]
         i += 1
 
     vol = volume(temp, P_sat, temp_crit, press_crit, acentric_factor)

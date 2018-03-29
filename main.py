@@ -35,27 +35,6 @@ alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
 
 runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
-Tc = (425.1, 469.7)
-Pc = (units.to_si(37.96, 'bar'), units.to_si(33.7, 'bar'))
-w = (0.2, 0.252)
-z = (0.3563, 0.6437)
-delta = ([0, 0], [0, 0])
-
-print(Multi.a_factor(100, Tc, Pc, z, w, delta))
-print(Multi.b_factor(Tc, Pc, z))
-
-poles = np.array([-1, 1.2, 1.5, 2, 3])
-print((np.extract(poles < 1, poles) > 0).any())
-print((poles < 0).any())
-if not (poles < 0).any() or not (poles > 1).any():
-    print('No solution')
-
-print(np.min(np.extract(poles > 1, poles)))
-print(np.max(np.extract(poles < 0, poles)))
-print([np.max(np.extract(poles < 0, poles)), np.min(np.extract(poles > 1, poles))])
-print(np.where(poles > 1)[0])
-print(np.extract(poles > 1, poles))
-
 
 Pr = list()
 Hv = list()
@@ -64,13 +43,13 @@ Hv_comp = list()
 
 for comp in range(0, 3):
     component = 'Methane'
-    Tr = np.linspace(0.48, 0.89, 100)
+    Tr = np.linspace(0.48, 0.999, 100)
     if comp == 1:
         component = 'Ethane'
-        Tr = np.linspace(0.3, 0.89, 100)
+        Tr = np.linspace(0.3, 0.999, 100)
     if comp == 2:
         component = 'Propane'
-        Tr = np.linspace(0.29, 0.89, 100)
+        Tr = np.linspace(0.29, 0.999, 100)
 
     properties = read.get_phase_change_data(component)
     Tc = properties[1]
@@ -79,7 +58,6 @@ for comp in range(0, 3):
 
     print('Component: ' + str(comp))
     for i in range(0, len(Tr)):
-        print(Tr[i])
         saturation = Single.saturation(Tr[i] * Tc, Tc, Pc, omega)
 
         Pr_comp.append(saturation[0] / Pc)
@@ -91,21 +69,21 @@ for comp in range(0, 3):
     Hv_comp.clear()
 
 fig1 = plt.figure()
-plt.plot(np.linspace(0.48, 0.89, 100), Pr[0], 'b', label='Methane', linestyle='-')
-plt.plot(np.linspace(0.3, 0.89, 100), Pr[1], 'b', label='Ethane', linestyle='--')
-plt.plot(np.linspace(0.29, 0.89, 100), Pr[2], 'b', label='Propane', linestyle=':')
+plt.plot(np.linspace(0.48, 0.999, 100), Pr[0], 'b', label='Methane', linestyle='-')
+plt.plot(np.linspace(0.3, 0.999, 100), Pr[1], 'b', label='Ethane', linestyle='--')
+plt.plot(np.linspace(0.29, 0.999, 100), Pr[2], 'b', label='Propane', linestyle=':')
 plt.legend()
-plt.xlabel('Reduced Temperature, Tr')
-plt.ylabel('Reduced Pressure Saturation, Pr')
+plt.xlabel('Reduced Temperature, $T_r$')
+plt.ylabel('Reduced Pressure Saturation, $P_{r, sat}$')
 plt.grid(True)
 
 fig2 = plt.figure()
-plt.plot(np.linspace(0.48, 0.89, 100), Hv[0], 'b', label='Methane', linestyle='-')
-plt.plot(np.linspace(0.3, 0.89, 100), Hv[1], 'b', label='Ethane', linestyle='--')
-plt.plot(np.linspace(0.29, 0.89, 100), Hv[2], 'b', label='Propane', linestyle=':')
+plt.plot(np.linspace(0.48, 0.999, 100), Hv[0], 'b', label='Methane', linestyle='-')
+plt.plot(np.linspace(0.3, 0.999, 100), Hv[1], 'b', label='Ethane', linestyle='--')
+plt.plot(np.linspace(0.29, 0.999, 100), Hv[2], 'b', label='Propane', linestyle=':')
 plt.legend()
-plt.xlabel('Reduced Temperature, Tr')
-plt.ylabel('Enthalpy of Vaporization, Hv (kJ/mol)')
+plt.xlabel('Reduced Temperature, $T_r$')
+plt.ylabel('Enthalpy of Vaporization, $H_{vap}$ (kJ/mol)')
 plt.grid(True)
 
 plt.show()
