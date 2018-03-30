@@ -193,10 +193,6 @@ def departure_H(temp, press, temp_crit, press_crit, acentric_factor):
     b = b_factor(temp_crit, press_crit)
 
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-    if np.isnan(vol[2]):
-        vol = vol[0]
-    else:
-        vol = vol[2]
 
     Z = press * vol / (R * temp)
     B = (b * press) / (R * temp)
@@ -229,11 +225,6 @@ def departure_S(temp, press, temp_crit, press_crit, acentric_factor):
     b = b_factor(temp_crit, press_crit)
 
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-
-    if np.isnan(vol[2]):
-        vol = vol[0]
-    else:
-        vol = vol[2]
 
     Z = press * vol / (R * temp)
     B = (b * press) / (R * temp)
@@ -288,10 +279,7 @@ def departure_U(temp, press, temp_crit, press_crit, acentric_factor):
     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
 
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-    if np.isnan(vol[2]):
-        vol = vol[0]
-    else:
-        vol = vol[2]
+
     dH = departure_H(temp, press, temp_crit, press_crit, acentric_factor)
 
     return dH - press * vol + R * temp
@@ -320,10 +308,6 @@ def departure_A(temp, press, temp_crit, press_crit, acentric_factor):
     dS = departure_S(temp, press, temp_crit, press_crit, acentric_factor)
 
     vol = volume(temp, press, temp_crit, press_crit, acentric_factor)
-    if np.isnan(vol[2]):
-        vol = vol[0]
-    else:
-        vol = vol[2]
 
     return dH - temp * dS - press * vol + R * temp
 
