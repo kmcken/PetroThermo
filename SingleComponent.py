@@ -87,9 +87,9 @@ def spinodal_pts(temp, temp_crit, press_crit, acentric_factor):
         R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
         return - R * temp / (vol - b) ** 2 + 2 * a * (vol + b) / (vol ** 2 + 2 * b * vol - b ** 2) ** 2
 
-    def ddpdv2_fun(vol):
-        R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
-        return 2 * R * temp * (vol ** 2 + 2 * b * vol - b ** 2) ** 3 - 4 * a * (2 * b + 1) * (vol - b) ** 3
+    # def ddpdv2_fun(vol):
+    #     R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+    #     return 2 * R * temp * (vol ** 2 + 2 * b * vol - b ** 2) ** 3 - 4 * a * (2 * b + 1) * (vol - b) ** 3
 
     roots = list()
     roots.append(optimize.root(dpdv_fun, b + 1e-5).x[0])
