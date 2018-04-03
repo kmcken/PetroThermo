@@ -36,18 +36,11 @@ alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
 runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
 
-T = 310
-P = 1e6
-Tc = 369.83
-Pc = 4.248e6
-w = 0.1523
+Z = (0.2648, 0.0951, 0.0961, 0.0173, 0.0501, 0.0188, 0.0281, 0.0378, 0.3919)
+K = (45.49, 6.563, 1.593, 0.6065, 0.4325, 0.1720, 0.1320, 0.04443, 0.0009542)
 
-print('Delta A = ' + str(Single.departure_A(T, P, Tc, Pc, w)))
-print('Delta G = ' + str(Single.departure_G(T, P, Tc, Pc, w)))
-print('Delta H = ' + str(Single.departure_H(T, P, Tc, Pc, w)))
-print('Delta S = ' + str(Single.departure_S(T, P, Tc, Pc, w)))
-print('Delta U = ' + str(Single.departure_U(T, P, Tc, Pc, w)))
-#
+print(Multi.RachfordRice(Z, K))
+
 # Pr = list()
 # Hv = list()
 # Pr_comp = list()

@@ -12,11 +12,13 @@ runlog = logging.getLogger('runlog')
 alglog = logging.getLogger('alglog')
 
 
-def RachfordRice(z, K):
+def RachfordRice(z, K, tolerance=1e-10):
     """
     Rachford-Rice equation
     :param z: Vector of the composition of the mixture (unitless)
     :param K: Vector that contains the composition of the mixture (unitless)
+    :param tolerance: Tolerance control (fraction)
+    :type tolerance: float
     :return: Vector of the liquid composition, x (unitless)
     :return: Vector of the gas compositiion, y (unitless)
     :return: Scalar of the liquid fraction (unitless)
@@ -42,18 +44,20 @@ def RachfordRice(z, K):
             f += z[i] * (1 - k[i]) / (n_L + k[i] * (1 - n_L))
         return f
 
-    nL_bounds = [np.max(np.extract(poles < 0, poles)), np.min(np.extract(poles > 1, poles))]
-    nL = (nL_bounds[1] - nL_bounds[0]) / 2 + nL_bounds[0]
-    fnL = rr_f(z, K, nL, N)
+    def rr_dfdn(z, k, n_L, n):
+        f = 0
+        for i in range(0, n):
+            f -= z[i] * (1 - k[i]) ** 2 / (n_L * (1 - k[i]) + k[i]) ** 2
+        return f
 
-    while not np.round(fnL, 4) == 0:
-        if fnL > 0:
-            nL_bounds[0] = copy.copy(nL)
-        if fnL < 0:
-            nL_bounds[1] = copy.copy(nL)
+    nL = 0
+    nL_next = 1
+    error = np.abs(nL - nL_next)
 
-        nL = (nL_bounds[1] - nL_bounds[0]) / 2 + nL_bounds[0]
-        fnL = rr_f(z, K, nL, N)
+    while error > tolerance:
+        nL_next = nL - rr_f(z, K, nL, N) / rr_dfdn(z, K, nL, N)
+        error = np.abs(nL - nL_next)
+        nL = nL_next
 
     x, y = list(), list()
     for i in range(0, N):
