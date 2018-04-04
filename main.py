@@ -35,11 +35,19 @@ alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
 
 runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
+print('Flash Calculations')
+T = units.to_si(160, 'degF')
+P = units.to_si(1500, 'psi')
+Z = [0.6, 0.1, 0.3]
+Tc = [190.56, 369.83, 469.7]
+Pc = [4.599e6, 4.248e6, 3.37e6]
+w = [0.0115, 0.1523, 0.2515]
+delta = [[0, 0.005, 0.019], [0.005, 0, 0], [0.019, 0, 0]]
 
-Z = (0.2648, 0.0951, 0.0961, 0.0173, 0.0501, 0.0188, 0.0281, 0.0378, 0.3919)
-K = (45.49, 6.563, 1.593, 0.6065, 0.4325, 0.1720, 0.1320, 0.04443, 0.0009542)
-
-print(Multi.RachfordRice(Z, K))
+x, y, nL = Multi.flash(T, P, Z, Tc, Pc, w, delta)
+print('X = ' + str(x))
+print('Y = ' + str(y))
+print('nL = ' + str(nL))
 
 # Pr = list()
 # Hv = list()

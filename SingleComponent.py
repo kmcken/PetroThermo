@@ -1,11 +1,9 @@
 import logging
 import os
-import sys
 
 import copy
 import numpy as np
 import scipy.optimize as optimize
-import UnitConverter as unit
 import QRDecomposition as qr
 
 root_path = os.path.dirname(os.path.realpath(__file__))

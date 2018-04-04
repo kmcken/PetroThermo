@@ -1,11 +1,12 @@
 import logging
 import os
+import sys
 
-import copy
+from copy import copy
 import numpy as np
 import SingleComponent as Single
-import UnitConverter as Units
 import QRDecomposition as qr
+import time
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 runlog = logging.getLogger('runlog')
@@ -24,19 +25,14 @@ def RachfordRice(z, K, tolerance=1e-10):
     :return: Scalar of the liquid fraction (unitless)
     :return: x, y, nL
     """
+
     N = len(z)
     if len(K) is not N:
         raise ValueError('Size of inputs do not agree.')
 
     poles = np.array(np.zeros(N))
     for i in range(0, len(K)):
-        poles[i] = (-K[i]/(1-K[i]))
-
-    # Check if solution exists
-    if (np.extract(poles < 1, poles) > 0).any():
-        print('Pole between 0 and 1')
-    if not (poles < 0).any() or not (poles > 1).any():
-        raise ValueError('No solution along the nL[0, 1] interval.')
+        poles[i] = (- K[i] / (1 - K[i]))
 
     def rr_f(z, k, n_L, n):
         f = 0
@@ -50,14 +46,30 @@ def RachfordRice(z, K, tolerance=1e-10):
             f -= z[i] * (1 - k[i]) ** 2 / (n_L * (1 - k[i]) + k[i]) ** 2
         return f
 
-    nL = 0
-    nL_next = 1
-    error = np.abs(nL - nL_next)
+    # Check if solution exists
+    if not (poles < 0).any():
+        nL = 1
+    else:
+        if not (poles > 1).any():
+            nL = 0
+        else:
+            nL = 1
+            error = 1
+            # nL_next = 0.5
+            # error = (nL - nL_next) ** 2 / (nL * nL_next)
 
-    while error > tolerance:
-        nL_next = nL - rr_f(z, K, nL, N) / rr_dfdn(z, K, nL, N)
-        error = np.abs(nL - nL_next)
-        nL = nL_next
+            limits = [0, 1]
+            while np.abs(error) > tolerance:
+                nL = (limits[1] - limits[0]) / 2 + limits[0]
+                error = rr_f(z, K, nL, N)
+                if error > 0:
+                    limits[0] = copy(nL)
+                else:
+                    limits[1] = copy(nL)
+
+                # nL_next = nL - rr_f(z, K, nL, N) / rr_dfdn(z, K, nL, N)
+                # error = (nL - nL_next) ** 2 / (nL * nL_next)
+                # nL = copy(nL_next)
 
     x, y = list(), list()
     for i in range(0, N):
@@ -67,7 +79,7 @@ def RachfordRice(z, K, tolerance=1e-10):
     return x, y, nL
 
 
-def flash(temp, press, z, temp_crit, press_crit, w, delta):
+def flash(temp, press, z, temp_crit, press_crit, w, delta, tolerance=1e-10):
     """
     Multicomponent flash calculation for the Peng-Robinson Equation of State.
 
@@ -80,6 +92,8 @@ def flash(temp, press, z, temp_crit, press_crit, w, delta):
     :param press_crit: Vector of Critical Pressure, Pc (Pa)
     :param w: Vector of Acentric Factor, omega (unitless)
     :param delta: Square matrix containing the binary interaction coefficients
+    :param tolerance: Tolerance control (fraction)
+    :type tolerance: float
     :return: Vector containing the liquid composition by component, x
     :return: Vector containing the gas composition by component, y
     :return: Molar specific volume of the liquid, VL
@@ -91,16 +105,111 @@ def flash(temp, press, z, temp_crit, press_crit, w, delta):
     if len(press_crit) and len(z) and len(w) and len(delta) is not N:
         raise ValueError('Size of inputs do not agree.')
 
-    K = np.array(np.ones(N) * 0.5)[0]
+    def error(x1, x2):
+        err = 0
+        for i in range(0, N):
+            err += (x1[i] - x2[i]) ** 2 / (x1[i] * x2[i])
+        return err
 
-    try:
-        x, y, nL = RachfordRice(z, K)
-    except ValueError:
-        alglog.info('No solution along the nL[0, 1] interval.')
-        raise ValueError('No solution along the nL[0, 1] interval.')
+    K_prev = np.array(np.ones(N) * 0.5)
+    K = np.array([3.992, .241, 0.0034])
+    err = error(K, K_prev)
+    x, y, nL = 0, 0, 0
 
-    x, y, VL, VG, nL = None, None, None, None, None
-    return x, y, VL, VG, nL
+    while err > tolerance:
+        K_prev = copy(K)
+        x, y, nL = RachfordRice(z, K, tolerance)
+        phi_L, phi_G = fugacity(temp, press, temp_crit, press_crit, x, y, z, w, delta)
+        K = phi_L / phi_G
+        err = error(K, K_prev)
+
+    return x, y, nL
+
+
+def fugacity(temp, press, temp_crit, press_crit, x, y, z, w, delta):
+    """
+    Calculates fugacity of the gas components in a mixture.
+
+    :param temp: Current Temperature, T (K)
+    :type temp: float
+    :param press: Current Pressure, P (Pa)
+    :type press: float
+    :param temp_crit: Vector of Critical Temperature, Tc (K)
+    :type temp_crit: nd.array
+    :param press_crit: Vector of Critical Pressure, Pc (Pa)
+    :type press_crit: nd.array
+    :param x: Vector containing the liquid composition by component, x
+    :type x: np.array
+    :param y: Vector containing the gas composition by component, y
+    :type y: np.array
+    :param z: Vector that contains the composition of the mixture (unitless)
+    :type z: np.array
+    :param w: Vector of Acentric Factor, omega (unitless)
+    :type w: nd.array
+    :param delta: Square matrix containing the binary interaction coefficients
+    :type delta: list
+    :return: Two vector of the fugacity by component, (phi_liquid, phi_gas)
+    """
+
+    N = len(temp_crit)
+    if len(press_crit) and len(z) and len(w) and len(delta) is not N:
+        raise ValueError('Size of inputs do not agree.')
+
+    R = 8.314459848  # Gas Constant: m^3 Pa mol^-1 K^-1
+
+    a, b = np.array(np.zeros(N)), np.array(np.zeros(N))
+    alpha, aT = np.array(np.zeros(N)), np.array(np.zeros(N))
+    for j in range(0, N):
+        Tr = temp / temp_crit[j]
+        alpha[j] = (1 + (0.37464 + 1.54226 * w[j] - 0.26992 * w[j] ** 2) * (1 - np.sqrt(Tr))) ** 2
+        a[j] = 0.45723553 * R**2 * temp_crit[j]**2 / press_crit[j]
+        b[j] = Single.b_factor(temp_crit[j], press_crit[j])
+        aT[j] = alpha[j] * a[j]
+
+    def aTb_fluid(aTj, bj, x, delta):
+        a, b = 0, 0
+        for i in range(0, len(x)):
+            b += x[i] * bj[i]
+            for j in range(0, len(x)):
+                a += x[i] * x[j] * np.sqrt(aTj[i] * aTj[j]) * (1 - delta[i][j])
+        return a, b
+
+    def ABprime(aTj, aT, b, b_mix, x, delta):
+        A, B = np.array(np.zeros(len(x))), np.array(np.zeros(len(x)))
+        for j in range(0, len(x)):
+            a = 0
+            for i in range(0, len(x)):
+                a += x[i] * np.sqrt(aTj[i]) * (1 - delta[j][i])
+            A[j] = 1 / aT * (2 * np.sqrt(aTj[j]) * a)
+            B[j] = b[j] / b_mix
+        return A, B
+
+    ab_liq = aTb_fluid(aT, b, x, delta)
+    AB_liq_p = ABprime(aT, ab_liq[0], b, ab_liq[1], x, delta)
+    ab_gas = aTb_fluid(aT, b, y, delta)
+    AB_gas_p = ABprime(aT, ab_gas[0], b, ab_gas[1], y, delta)
+
+    AB_liq = ab_liq[0] * press / (R ** 2 * temp ** 2), ab_liq[1] * press / (R * temp)
+    AB_gas = ab_gas[0] * press / (R ** 2 * temp ** 2), ab_gas[1] * press / (R * temp)
+
+    z_factor = np.array(np.zeros(2))
+    z_factor[0] = np.real(qr.cubic_root(AB_liq[1] - 1, AB_liq[0] - 2 * AB_liq[1] - 3 * AB_liq[1] ** 2,
+                                        - AB_liq[0] * AB_liq[1] + AB_liq[1] ** 2 + AB_liq[1] ** 3)[0])
+    z_factor[1] = np.real(qr.cubic_root(AB_gas[1] - 1, AB_gas[0] - 2 * AB_gas[1] - 3 * AB_gas[1] ** 2,
+                                        - AB_gas[0] * AB_gas[1] + AB_gas[1] ** 2 + AB_gas[1] ** 3)[0])
+
+    phi_gas, phi_liq = np.array(np.zeros(N)), np.array(np.zeros(N))
+    for j in range(0, N):
+        phi_gas[j] = np.exp(- np.log(z_factor[1] - AB_gas[1]) + (z_factor[1] - 1) * AB_gas_p[1][j] - AB_gas[0] /
+                            (np.power(2, 1.5) * AB_gas[1]) * (AB_gas_p[0][j] - AB_gas_p[1][j]) *
+                            np.log((z_factor[1] + (1 + np.sqrt(2)) * AB_gas[1]) /
+                                   (z_factor[1] + (1 - np.sqrt(2)) * AB_gas[1])))
+        phi_liq[j] = np.exp(- np.log(z_factor[0] - AB_liq[1]) + (z_factor[0] - 1) * AB_liq_p[1][j] - AB_liq[0] /
+                            (np.power(2, 1.5) * AB_liq[1]) * (AB_liq_p[0][j] - AB_liq_p[1][j]) *
+                            np.log((z_factor[0] + (1 + np.sqrt(2)) * AB_liq[1]) /
+                                   (z_factor[0] + (1 - np.sqrt(2)) * AB_liq[1])))
+
+    return phi_liq, phi_gas
 
 
 def pressure(temp, vol, z, temp_crit, press_crit, w, delta):
