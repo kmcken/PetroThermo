@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 import os
 import sqlite3
 
@@ -7,7 +8,35 @@ runlog = logging.getLogger('runlog')
 alglog = logging.getLogger('alglog')
 
 
+def scn_composition(file):
+    """
+    Reads SCN composition model.
+
+    :param file: File location
+    :type file: str
+    :return:
+    """
+
+    runlog.info('Read from {0} file.'.format(file))
+
+    string = read_file(file)
+    name = list()
+    number = list()
+    fraction = list()
+    for i in range(1, len(string)):
+        name.append(string[i][0]), number.append(float(string[i][1])), fraction.append(float(string[i][2]))
+    return tuple(name), np.array(number), np.array(fraction)
+
+
 def read_file(file):
+    """
+    Reads generic .csv file.
+
+    :param file: File location
+    :type file: str
+    :return: Comma delimited list by line
+    """
+
     runlog.info('Read from {0} file.'.format(file))
 
     txt_file = list()
@@ -39,7 +68,7 @@ def get_phase_change_data(name=None, formula=None, database=None):
         raise ValueError('PHASE CHANGE: No chemical name or formula input.')
 
     if database is None:
-        database = root_path + '/ChemistryData.db'
+        database = root_path + '/Data/ChemistryData.db'
 
     runlog.info('PHASE CHANGE: Read data from {0} file.'.format(database))
 

@@ -1,12 +1,10 @@
 import logging
 import os
-import sys
 
 from copy import copy
 import numpy as np
 import SingleComponent as Single
 import QRDecomposition as qr
-import time
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 runlog = logging.getLogger('runlog')

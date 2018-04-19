@@ -1,0 +1,14 @@
+name,n-number,fraction
+Methane,1,0.37
+Ethane,2,0.1
+Propane,3,0.07
+Butanes,4,0.06
+Pentanes,5,0.03
+Hexanes,6,0.04
+Heptanes,7,0.05
+Octanes,8,0.05
+Nonanes,9,0.04
+Decanes,10,0.03
+n-C12,12,0.04
+n-C15,15,0.04
+n-C20,20,0.08

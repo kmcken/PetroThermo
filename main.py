@@ -4,11 +4,8 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import SingleComponent as Single
-import MultiComponent as Multi
+import SCNComposition as scn
 import ReadFromFile as read
-
-import UnitConverter as units
 
 
 # LOGGING
@@ -35,70 +32,29 @@ alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
 
 runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
-print('Flash Calculations')
-T = units.to_si(160, 'degF')
-P = units.to_si(1500, 'psi')
-Z = [0.6, 0.1, 0.3]
-Tc = [190.56, 369.83, 469.7]
-Pc = [4.599e6, 4.248e6, 3.37e6]
-w = [0.0115, 0.1523, 0.2515]
-delta = [[0, 0.005, 0.019], [0.005, 0, 0], [0.019, 0, 0]]
+names, number, fractions = read.scn_composition(root_path + '/Data/composition.txt')
 
-x, y, nL = Multi.flash(T, P, Z, Tc, Pc, w, delta)
-print('X = ' + str(x))
-print('Y = ' + str(y))
-print('nL = ' + str(nL))
+zc7p = scn.z_c7plus(number, fractions)
 
-# Pr = list()
-# Hv = list()
-# Pr_comp = list()
-# Hv_comp = list()
-#
-# for comp in range(0, 3):
-#     component = 'Methane'
-#     Tr = np.linspace(0.48, 0.999, 100)
-#     if comp == 1:
-#         component = 'Ethane'
-#         Tr = np.linspace(0.3, 0.999, 100)
-#     if comp == 2:
-#         component = 'Propane'
-#         Tr = np.linspace(0.29, 0.999, 100)
-#
-#     properties = read.get_phase_change_data(component)
-#     Tc = properties[1]
-#     Pc = properties[2]
-#     omega = properties[5]
-#
-#     print('Component: ' + str(comp))
-#     for i in range(0, len(Tr)):
-#         saturation = Single.saturation(Tr[i] * Tc, Tc, Pc, omega)
-#
-#         Pr_comp.append(saturation[0] / Pc)
-#         Hv_comp.append(saturation[1] / 1000)
-#
-#     Pr.append(list(Pr_comp))
-#     Hv.append(list(Hv_comp))
-#     Pr_comp.clear()
-#     Hv_comp.clear()
-#
-# fig1 = plt.figure()
-# plt.plot(np.linspace(0.48, 0.999, 100), Pr[0], 'b', label='Methane', linestyle='-')
-# plt.plot(np.linspace(0.3, 0.999, 100), Pr[1], 'b', label='Ethane', linestyle='--')
-# plt.plot(np.linspace(0.29, 0.999, 100), Pr[2], 'b', label='Propane', linestyle=':')
-# plt.legend()
-# plt.xlabel('Reduced Temperature, $T_r$')
-# plt.ylabel('Reduced Pressure Saturation, $P_{r, sat}$')
-# plt.grid(True)
-#
-# fig2 = plt.figure()
-# plt.plot(np.linspace(0.48, 0.999, 100), Hv[0], 'b', label='Methane', linestyle='-')
-# plt.plot(np.linspace(0.3, 0.999, 100), Hv[1], 'b', label='Ethane', linestyle='--')
-# plt.plot(np.linspace(0.29, 0.999, 100), Hv[2], 'b', label='Propane', linestyle=':')
-# plt.legend()
-# plt.xlabel('Reduced Temperature, $T_r$')
-# plt.ylabel('Enthalpy of Vaporization, $H_{vap}$ (kJ/mol)')
-# plt.grid(True)
-#
-# plt.show()
+exp_const = scn.exp_regression(number[7:], fractions[7:], zc7p)
+lbc_const = scn.lbc_regression(number[5:-2], fractions[5:-2], fractions[5])
 
+n = np.linspace(1, 40, 400)
+z_exp = scn.exp_compostion(n, *exp_const)
+z_lbc = scn.lbc_compostion(n, *lbc_const)
+
+fig = plt.figure()
+ax = plt.axes()
+plt.bar(number, fractions)
+plt.plot(n, z_exp, 'k--', label='Exponential')
+plt.plot(n, z_lbc, 'b--', label='Lorenz-Bray-Clark')
+ax.xaxis.set_major_locator(plt.MultipleLocator(5))
+ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%d'))
+ax.xaxis.set_minor_locator(plt.MultipleLocator(1))
+plt.xlabel('Single Carbon Number (SCN) Group')
+plt.ylabel('Mole Fraction')
+plt.legend()
+plt.show()
+
+print('Target Destroyed')
 runlog.info('END Target Destroyed')
