@@ -48,7 +48,7 @@ def read_file(file):
     return txt_file
 
 
-def get_phase_change_data(name=None, formula=None, database=None):
+def get_phase_change_data(name=None, formula=None, scn=None, database=None):
     """
     Gets the phase change data from the .db file for a specific substance.
     Input name OR formula.
@@ -57,6 +57,8 @@ def get_phase_change_data(name=None, formula=None, database=None):
     :type name: str
     :param formula: Substance formula
     :type formula: str
+    :param scn: Single Carbon Number
+    :type scn: int
     :param database: Database file path
     :type database: str
     :return: [MW, Tc, Pc, Ttrip, Ptrip, Acentric]: Phase Change
@@ -80,9 +82,12 @@ def get_phase_change_data(name=None, formula=None, database=None):
         raise FileNotFoundError
 
     if name is not None:
-        cursor.execute('SELECT MW, Tc, Pc, Ttrip, Ptrip, Acentric FROM PhaseChange WHERE Name=?', [name])
+        cursor.execute('SELECT MW, Tc, Pc, Acentric FROM PhaseChange WHERE Name=?', [name])
     else:
-        cursor.execute('SELECT MW, Tc, Pc, Ttrip, Ptrip, Acentric FROM PhaseChange WHERE Formula=?', [formula])
+        if formula is not None:
+            cursor.execute('SELECT MW, Tc, Pc, Acentric FROM PhaseChange WHERE Formula=?', [formula])
+        else:
+            cursor.execute('SELECT MW, Tc, Pc, Acentric FROM PhaseChange WHERE SCN=?', [scn])
     constants = cursor.fetchall()
     close_database(cursor, conn)
 
