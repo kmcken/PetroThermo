@@ -61,11 +61,11 @@ def get_phase_change_data(name=None, formula=None, scn=None, database=None):
     :type scn: int
     :param database: Database file path
     :type database: str
-    :return: [MW, Tc, Pc, Ttrip, Ptrip, Acentric]: Phase Change
-    :rtype: [MW, Tc, Pc, Ttrip, Ptrip, Acentric]: float
+    :return: [MW, Tc, Pc, Acentric]: Phase Change
+    :rtype: list
     """
 
-    if name is None and formula is None:
+    if name is None and formula is None and scn is None:
         runlog.error('PHASE CHANGE: No chemical name or formula input.')
         raise ValueError('PHASE CHANGE: No chemical name or formula input.')
 

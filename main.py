@@ -7,6 +7,8 @@ import numpy as np
 import SCNComposition as scn
 import ReadFromFile as read
 
+import UnitConverter as units
+
 
 # LOGGING
 def setup_logger(name, log_file, level=logging.INFO):
@@ -32,22 +34,30 @@ alglog = setup_logger('alglog', root_path + '/Logs/alg.log')
 
 runlog.info('START Thermodynamic Analysis of Multi-Phase Petroleum Fluids.')
 
+print(read.get_phase_change_data(scn=1))
+
 names, number, fractions = read.scn_composition(root_path + '/Data/composition.txt')
 
+print(units.from_si(1, 'cm3'))
+print(scn.MW_c7plus(number, fractions))
+
+# sys.exit()
 zc7p = scn.z_c7plus(number, fractions)
 
 exp_const = scn.exp_regression(number[7:], fractions[7:], zc7p)
 lbc_const = scn.lbc_regression(number[5:-2], fractions[5:-2], fractions[5])
 
-n = np.linspace(1, 40, 400)
+n = np.linspace(7, 30, 300)
 z_exp = scn.exp_compostion(n, *exp_const)
 z_lbc = scn.lbc_compostion(n, *lbc_const)
+z_katz = scn.katz_composition(n, zc7p)
 
 fig = plt.figure()
 ax = plt.axes()
 plt.bar(number, fractions)
 plt.plot(n, z_exp, 'k--', label='Exponential')
-plt.plot(n, z_lbc, 'b--', label='Lorenz-Bray-Clark')
+plt.plot(n, z_lbc, 'b-.', label='Lorenz-Bray-Clark')
+plt.plot(n, z_katz, 'g:', label='Katz')
 ax.xaxis.set_major_locator(plt.MultipleLocator(5))
 ax.xaxis.set_major_formatter(plt.FormatStrFormatter('%d'))
 ax.xaxis.set_minor_locator(plt.MultipleLocator(1))

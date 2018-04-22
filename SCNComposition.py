@@ -4,7 +4,9 @@ import os
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
+import ReadFromFile as read
 import scipy.optimize as optimize
+import UnitConverter as units
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 runlog = logging.getLogger('runlog')
@@ -15,11 +17,23 @@ def pdf(M, tau, beta, gamma):
     pass
 
 
+def MW_c7plus(n, fractions):
+    z_c7p = z_c7plus(n, fractions)
+    index7 = 0
+    while n[index7] < 7:
+        index7 += 1
+    index7 -= 1
+
+    MW_c7p = 0
+    for i in range(index7, len(n)):
+        MW_c7p += read.get_phase_change_data(scn=n[i])[0] * fractions[i] / z_c7p
+    return MW_c7p
+
+
 def z_c7plus(n, fractions):
     index7 = 0
     while n[index7] < 7:
         index7 += 1
-
     index7 -= 1
 
     z_c7p = 0
@@ -28,24 +42,21 @@ def z_c7plus(n, fractions):
     return z_c7p
 
 
-def gamma_c7plus(n, gamma):
-    """
-    Calculates the C7+ specific gravity
-
-    :param n: Carbon number of composition
-    :type n: np.array
-    :param gamma: Specific gravity of compsition
-    :type gamma: np.array
-    :return: gamma_c7
-    :rtype: float
-    """
-
-    for i in (0, 1):
-        pass
+# def gamma_c7plus(n, fractions):
+#     z_c7p = z_c7plus(n, fractions)
+#     index7 = 0
+#     while n[index7] < 7:
+#         index7 += 1
+#     index7 -= 1
+#
+#     gamma = 0
+#     for i in range(index7, len(n)):
+#         gamma += read.get_phase_change_data(scn=n[i])[0] * fractions[i] / z_c7p
+#     return gamma
 
 
-def katz_composition(n, gamma_c7p):
-    return 1.38205 * gamma_c7p * np.exp(-0.25903 * n)
+def katz_composition(n, z_c7plus):
+    return 1.38205 * z_c7plus * np.exp(-0.25903 * n)
 
 
 def lnexp_compostion(n, zc7plus, beta):
@@ -98,21 +109,39 @@ def lbc_regression(n, z, z6):
     return popt
 
 
-def watson_factor(MW, gamma):
+def watson_factor(MW, SG):
     """
     Watson Characterization Factor for C7+
 
     :param MW: molecular weight
     :type MW: float
-    :param gamma: specific gravity
-    :type gamma: float
+    :param SG: specific gravity
+    :type SG: float
     :return: kw, gamma
     :return: Watson characterization factor
     :rtype: float
     """
 
-    return 4.5579 * np.power(MW, 0.15178) * np.power(gamma, -0.84573)
+    return 4.5579 * np.power(MW, 0.15178) * np.power(SG, -0.84573)
+
+
+def watson_gamma(MW, kw):
+    """Specific gravity from Watson characterization factor.
+
+    :param MW: molecular weight
+    :type MW: float
+    :param kw: Watson Characterization Factor
+    :type kw: float
+    :return: SG specific gravity
+    :rtype: float
+    """
+
+    return np.power(kw / (4.5579 * np.power(MW, 0.15178)), 0.84573)
     
+
+def watson_boiling_pt(kw, SG):
+    return np.power(kw * SG, 3)
+
 
 def gauss_laguerre_quadrature_consts(order):
     """
