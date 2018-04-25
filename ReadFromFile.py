@@ -99,6 +99,41 @@ def get_phase_change_data(name=None, formula=None, scn=None, database=None):
     return constants[0]
 
 
+def get_binary_interations(database=None):
+    """
+    Gets the binary interaction coefficient
+    :param database: Database file path
+    :type database: str
+    :return: delta: Binary Interaction Matrix
+    :rtype: np.array
+    """
+
+    if database is None:
+        database = root_path + '/Data/ChemistryData.db'
+
+    runlog.info('BINARY INTERACTIONS: Read data from {0} file.'.format(database))
+
+    try:
+        (cursor, conn) = open_database(database)
+    except FileNotFoundError:
+        raise FileNotFoundError
+    except sqlite3.InterfaceError:
+        raise FileNotFoundError
+
+    delta = np.array(np.zeros((30, 30)))
+    for i in range(0, 30):
+        cursor.execute('SELECT * FROM BinaryInteractions WHERE SCN=?', [i + 1])
+        binary = cursor.fetchall()[0]
+        for j in range(0, 9):
+            if binary[j + 1] is None:
+                delta[i][j] = 0.
+            else:
+                delta[i][j] = binary[j + 1]
+
+    close_database(cursor, conn)
+    return delta
+
+
 def get_heat_capacity_constants(name=None, formula=None, database=None):
     """
     Gets the Heat Capacity Constants from the .db file
