@@ -99,9 +99,11 @@ def get_phase_change_data(name=None, formula=None, scn=None, database=None):
     return constants[0]
 
 
-def get_binary_interations(database=None):
+def get_binary_interations(scn_list=None, database=None):
     """
     Gets the binary interaction coefficient
+    :param scn_list: List of SCN groups in mixture
+    :type scn_list: list
     :param database: Database file path
     :type database: str
     :return: delta: Binary Interaction Matrix
@@ -110,6 +112,11 @@ def get_binary_interations(database=None):
 
     if database is None:
         database = root_path + '/Data/ChemistryData.db'
+
+    if scn_list is None:
+        scn_list = list()
+        for i in range(1, 31):
+            scn_list.append(i)
 
     runlog.info('BINARY INTERACTIONS: Read data from {0} file.'.format(database))
 
@@ -120,11 +127,15 @@ def get_binary_interations(database=None):
     except sqlite3.InterfaceError:
         raise FileNotFoundError
 
-    delta = np.array(np.zeros((30, 30)))
-    for i in range(0, 30):
-        cursor.execute('SELECT * FROM BinaryInteractions WHERE SCN=?', [i + 1])
+    N = len(scn_list)
+    delta = np.array(np.zeros((N, N)))
+    for i in range(0, N):
+        cursor.execute('SELECT * FROM BinaryInteractions WHERE SCN=?', [scn_list[i]])
         binary = cursor.fetchall()[0]
-        for j in range(0, 9):
+        for j in range(0, N):
+            if j > 8:
+                delta[i][j] = 0
+                continue
             if binary[j + 1] is None:
                 delta[i][j] = 0.
             else:
