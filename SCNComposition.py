@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import ReadFromFile as read
+import scipy.integrate as integrate
 import scipy.optimize as optimize
 import scipy.special as special
 
@@ -14,7 +15,7 @@ alglog = logging.getLogger('alglog')
 def MW_c7plus(n, fractions):
     z_c7p = z_c7plus(n, fractions)
     index7 = 0
-    while n[index7] < 7:
+    while n[index7] < 8:
         index7 += 1
     index7 -= 1
 
@@ -26,7 +27,7 @@ def MW_c7plus(n, fractions):
 
 def z_c7plus(n, fractions):
     index7 = 0
-    while n[index7] < 7:
+    while n[index7] < 8:
         index7 += 1
     index7 -= 1
 
@@ -40,8 +41,17 @@ def katz_composition(n, z_c7plus):
     return 1.38205 * z_c7plus * np.exp(-0.25903 * n)
 
 
+def pedersen_composition(n, alpha, beta):
+    return np.exp((n - alpha) / beta)
+
+
+def pedersen_regression(n, z):
+    popt, pcov = optimize.curve_fit(pedersen_composition, n, z)
+    return popt
+
+
 def lnexp_compostion(n, zc7plus, beta):
-    return zc7plus + np.exp((7 - n) * beta) + beta
+    return np.log(zc7plus) + (7 - n) * beta + np.log(beta)
 
 
 def exp_compostion(n, alpha, beta):
@@ -60,7 +70,7 @@ def exp_regression(n, z, zc7plus):
     :rtype np.array
     """
 
-    popt, pcov = optimize.curve_fit(lnexp_compostion, n, z, bounds=((zc7plus - 1e-10, 0), (zc7plus, np.inf)))
+    popt, pcov = optimize.curve_fit(lnexp_compostion, n, np.log(z), bounds=((zc7plus - 1e-10, 0), (zc7plus, np.inf)))
 
     def alpha(zc7p, beta):
         return np.log(zc7p) + 7 * beta + np.log(beta)
@@ -69,25 +79,8 @@ def exp_regression(n, z, zc7plus):
     return a, popt[1]
 
 
-def lbc_compostion(n, z6, alpha, beta):
-    return z6 * np.exp(alpha * (n - 6) - beta * (n - 6) ** 2)
-
-
-def lbc_regression(n, z, z6):
-    """
-    Mix-Integer Nonlinear Program to regression fit the Lorenz-Bray-Clark approximation of mole fraction.
-
-    :param n: n-number of known data
-    :type n: np.array
-    :param z: Mole fraction of known data
-    :type z: np.array
-    :return: alpha, beta
-    :rtype np.array
-    """
-
-    popt, pcov = optimize.curve_fit(lbc_compostion, n, z, bounds=((z6 - 1e-8, 0, 0), (z6, np.inf, np.inf)))
-
-    return popt
+def lbc_compostion(n, z_6, alpha, beta):
+    return z_6 * np.exp(alpha * (n - 6) ** 2 + beta * (n - 6))
 
 
 def watson_factor(MW, SG):
@@ -124,32 +117,27 @@ def watson_boiling_pt(kw, SG):
     return np.power(kw * SG, 3)
 
 
-def pdf_composition(MW, tau, gamma, beta):
-    euler = special.gamma(gamma)
-    chi = MW - tau
-    alpha = 1 / (gamma * beta * euler)
-    return np.power(chi, gamma - 1) * np.exp(-1 * chi / beta) * alpha
+def pdf_composition(n, alpha, beta, limits):
+    return integrate.quad(pdf_whitson, limits[0], limits[1], args=(n, alpha, beta))[0]
 
 
-def pdf_regression(MW, z, tau=None):
-    """
-    Mix-Integer Nonlinear Program to regression fit the probability density fraction of molecular weights.
+def pdf_whitson(MW, n, alpha, beta):
+    euler = special.gamma(alpha)
+    return np.power(MW - n, alpha - 1) * np.exp(-1 * (MW - n) / beta) / (np.power(beta, alpha) * euler)
 
-    :param MW: molecular weight
-    :type MW np.array
-    :param z: Mole fraction of known data
-    :type z: np.array
-    :param tau: minimum molecular weight
-    :type tau: float
-    :return: tau, gamma, beta
-    :rtype np.array
-    """
 
-    if tau is None:
-        tau = 0
+def pdf_regression(MW, fraction, n=None):
+    if n is None:
+        n = 16.0425
 
-    popt, pcov = optimize.curve_fit(pdf_composition, MW, z, bounds=((tau, 0, -np.inf), (tau + 1e-10, np.inf, np.inf)))
-    return popt
+    def min_pdf(x, m, z, n):
+        pdf = np.abs(pdf_composition(n, x[0], x[1], [n, m[0]]) - z[0])
+        for i in range(1, len(m)):
+            pdf += np.abs(pdf_composition(n, x[0], x[1], [m[i - 1], m[i]]) - z[i])
+        return pdf
+
+    opt = optimize.minimize(min_pdf, x0=np.array([1, 10]), method='Nelder-Mead', bounds=((0.5, -np.inf), (3, np.inf)), args=(MW, fraction, n))
+    return opt.x
 
 
 def gauss_lumping(tau, gamma, beta, order, z_c7p):
