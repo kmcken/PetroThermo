@@ -3,6 +3,7 @@ import os
 
 from copy import copy
 import numpy as np
+import scipy.optimize as optimze
 import SingleComponent as Single
 import QRDecomposition as qr
 
@@ -32,42 +33,27 @@ def RachfordRice(z, K, tolerance=1e-10):
     for i in range(0, len(K)):
         poles[i] = (- K[i] / (1 - K[i]))
 
-    def rr_f(z, k, n_L, n):
+    def rr_f(n_L, z, k, n):
         f = 0
         for i in range(0, n):
             f += z[i] * (1 - k[i]) / (n_L + k[i] * (1 - n_L))
         return f
 
-    def rr_dfdn(z, k, n_L, n):
-        f = 0
-        for i in range(0, n):
-            f -= z[i] * (1 - k[i]) ** 2 / (n_L * (1 - k[i]) + k[i]) ** 2
-        return f
-
     # Check if solution exists
+    # nL = optimze.newton(rr_f, 0.5, args=(z, K, N))
+
+    poles = np.sort(poles)
     if not (poles < 0).any():
-        nL = 1
+        nL = 0
     else:
         if not (poles > 1).any():
-            nL = 0
-        else:
             nL = 1
-            error = 1
-            # nL_next = 0.5
-            # error = (nL - nL_next) ** 2 / (nL * nL_next)
-
-            limits = [0, 1]
-            while np.abs(error) > tolerance:
-                nL = (limits[1] - limits[0]) / 2 + limits[0]
-                error = rr_f(z, K, nL, N)
-                if error > 0:
-                    limits[0] = copy(nL)
-                else:
-                    limits[1] = copy(nL)
-
-                # nL_next = nL - rr_f(z, K, nL, N) / rr_dfdn(z, K, nL, N)
-                # error = (nL - nL_next) ** 2 / (nL * nL_next)
-                # nL = copy(nL_next)
+        else:
+            nL = optimze.newton(rr_f, 0.5, args=(z, K, N), tol=tolerance)
+            if nL < 0:
+                nL = 0
+            if nL > 1:
+                nL = 1
 
     x, y = list(), list()
     for i in range(0, N):
@@ -77,7 +63,7 @@ def RachfordRice(z, K, tolerance=1e-10):
     return x, y, nL
 
 
-def flash(temp, press, z, temp_crit, press_crit, w, delta, tolerance=1e-10):
+def flash(temp, press, z, temp_crit, press_crit, w, delta=None, tolerance=1e-10):
     """
     Multicomponent flash calculation for the Peng-Robinson Equation of State.
 
@@ -100,6 +86,12 @@ def flash(temp, press, z, temp_crit, press_crit, w, delta, tolerance=1e-10):
     """
 
     N = len(temp_crit)
+
+    if delta is None:
+        delta = list()
+        for i in range(0, N):
+            delta.append(list(np.zeros(N)))
+
     if len(press_crit) and len(z) and len(w) and len(delta) is not N:
         raise ValueError('Size of inputs do not agree.')
 
@@ -110,15 +102,15 @@ def flash(temp, press, z, temp_crit, press_crit, w, delta, tolerance=1e-10):
         return err
 
     K_prev = np.array(np.ones(N) * 0.5)
-    K = np.array([3.992, .241, 0.0034])
+    K = np.array(np.ones(N) * 0.1)
     err = error(K, K_prev)
     x, y, nL = 0, 0, 0
 
-    while err > tolerance:
+    while np.abs(err) > tolerance:
         K_prev = copy(K)
         x, y, nL = RachfordRice(z, K, tolerance)
         phi_L, phi_G = fugacity(temp, press, temp_crit, press_crit, x, y, z, w, delta)
-        K = phi_L / phi_G
+        K = np.exp(phi_L - phi_G)
         err = error(K, K_prev)
 
     return x, y, nL
@@ -196,16 +188,14 @@ def fugacity(temp, press, temp_crit, press_crit, x, y, z, w, delta):
     z_factor[1] = np.real(qr.cubic_root(AB_gas[1] - 1, AB_gas[0] - 2 * AB_gas[1] - 3 * AB_gas[1] ** 2,
                                         - AB_gas[0] * AB_gas[1] + AB_gas[1] ** 2 + AB_gas[1] ** 3)[0])
 
-    phi_gas, phi_liq = np.array(np.zeros(N)), np.array(np.zeros(N))
+    phi_gas, phi_liq = np.array(np.zeros(N), dtype=np.float64), np.array(np.zeros(N), dtype=np.float64)
     for j in range(0, N):
-        phi_gas[j] = np.exp(- np.log(z_factor[1] - AB_gas[1]) + (z_factor[1] - 1) * AB_gas_p[1][j] - AB_gas[0] /
-                            (np.power(2, 1.5) * AB_gas[1]) * (AB_gas_p[0][j] - AB_gas_p[1][j]) *
-                            np.log((z_factor[1] + (1 + np.sqrt(2)) * AB_gas[1]) /
-                                   (z_factor[1] + (1 - np.sqrt(2)) * AB_gas[1])))
-        phi_liq[j] = np.exp(- np.log(z_factor[0] - AB_liq[1]) + (z_factor[0] - 1) * AB_liq_p[1][j] - AB_liq[0] /
-                            (np.power(2, 1.5) * AB_liq[1]) * (AB_liq_p[0][j] - AB_liq_p[1][j]) *
-                            np.log((z_factor[0] + (1 + np.sqrt(2)) * AB_liq[1]) /
-                                   (z_factor[0] + (1 - np.sqrt(2)) * AB_liq[1])))
+        phi_gas[j] = - np.log(z_factor[1] - AB_gas[1]) + (z_factor[1] - 1) * AB_gas_p[1][j] - AB_gas[0] / \
+                     (np.power(2, 1.5) * AB_gas[1]) * (AB_gas_p[0][j] - AB_gas_p[1][j]) * \
+                     np.log((z_factor[1] + (1 + np.sqrt(2)) * AB_gas[1]) / (z_factor[1] + (1 - np.sqrt(2)) * AB_gas[1]))
+        phi_liq[j] = - np.log(z_factor[0] - AB_liq[1]) + (z_factor[0] - 1) * AB_liq_p[1][j] - AB_liq[0] / \
+                     (np.power(2, 1.5) * AB_liq[1]) * (AB_liq_p[0][j] - AB_liq_p[1][j]) * \
+                     np.log((z_factor[0] + (1 + np.sqrt(2)) * AB_liq[1]) / (z_factor[0] + (1 - np.sqrt(2)) * AB_liq[1]))
 
     return phi_liq, phi_gas
 
