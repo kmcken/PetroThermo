@@ -1,20 +1,14 @@
 import logging
 import os
 
-import copy
-import matplotlib.pyplot as plt
 import numpy as np
 import ReadFromFile as read
 import scipy.optimize as optimize
-import UnitConverter as units
+import scipy.special as special
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 runlog = logging.getLogger('runlog')
 alglog = logging.getLogger('alglog')
-
-
-def pdf(M, tau, beta, gamma):
-    pass
 
 
 def MW_c7plus(n, fractions):
@@ -40,19 +34,6 @@ def z_c7plus(n, fractions):
     for i in range(index7, len(n)):
         z_c7p += fractions[i]
     return z_c7p
-
-
-# def gamma_c7plus(n, fractions):
-#     z_c7p = z_c7plus(n, fractions)
-#     index7 = 0
-#     while n[index7] < 7:
-#         index7 += 1
-#     index7 -= 1
-#
-#     gamma = 0
-#     for i in range(index7, len(n)):
-#         gamma += read.get_phase_change_data(scn=n[i])[0] * fractions[i] / z_c7p
-#     return gamma
 
 
 def katz_composition(n, z_c7plus):
@@ -143,6 +124,66 @@ def watson_boiling_pt(kw, SG):
     return np.power(kw * SG, 3)
 
 
+def pdf_composition(MW, tau, gamma, beta):
+    euler = special.gamma(gamma)
+    chi = MW - tau
+    alpha = 1 / (gamma * beta * euler)
+    return np.power(chi, gamma - 1) * np.exp(-1 * chi / beta) * alpha
+
+
+def pdf_regression(MW, z, tau=None):
+    """
+    Mix-Integer Nonlinear Program to regression fit the probability density fraction of molecular weights.
+
+    :param MW: molecular weight
+    :type MW np.array
+    :param z: Mole fraction of known data
+    :type z: np.array
+    :param tau: minimum molecular weight
+    :type tau: float
+    :return: tau, gamma, beta
+    :rtype np.array
+    """
+
+    if tau is None:
+        tau = 0
+
+    popt, pcov = optimize.curve_fit(pdf_composition, MW, z, bounds=((tau, 0, -np.inf), (tau + 1e-10, np.inf, np.inf)))
+    return popt
+
+
+def gauss_lumping(tau, gamma, beta, order, z_c7p):
+    """
+    Hydrocarbon lumping using Gauss-Laguerre Quadrature
+
+    :param tau: Minimum molecular weight
+    :type tau: float
+    :param gamma: Fitting parameter
+    :type gamma: float
+    :param beta: Fitting parameter
+    :type beta: float
+    :param order: Gauss-Laguerre approximation order
+    :type order: int
+    :param z_c7p: C7+ Fraction
+    :type z_c7p: float
+    :return: MW, Zi, and Z_c7+
+    """
+    def molecular_weight(chi, tau, beta):
+        return chi * beta + tau
+
+    def gl_fractions(chi, gamma):
+        return np.power(chi, gamma - 1) / (special.gamma(gamma))
+
+    chi, w = gauss_laguerre_quadrature_consts(order)
+    mw, fraction= list(), list()
+
+    for i in range(0, order):
+        mw.append(molecular_weight(chi[i], tau, beta))
+        fraction.append(w[i] * gl_fractions(chi[i], gamma) * z_c7p)
+
+    return np.array(mw), np.array(fraction), np.sum(np.array(fraction))
+
+
 def gauss_laguerre_quadrature_consts(order):
     """
     Returns the Guass-Laguerre Quadrature constants.
@@ -152,8 +193,8 @@ def gauss_laguerre_quadrature_consts(order):
     :return: xi, w
     """
 
-    if order is not 2 or 3 or 4:
-        raise ValueError('Guass-Laguerre order is not 2, 3, or 4.')
+    if order != 2 and order != 3 and order != 4:
+        raise ValueError('Gauss-Laguerre order is not 2, 3, or 4.')
 
     if order == 2:
         xi = (0.5858, 3.4142)
@@ -168,3 +209,7 @@ def gauss_laguerre_quadrature_consts(order):
                 w = (0.6032, 0.3574, 0.0384, 0.0005)
 
     return xi, w
+
+
+def acentric(M):
+    return -0.3 + np.exp(-6.252 + 3.64457 * np.power(M, 0.1))
