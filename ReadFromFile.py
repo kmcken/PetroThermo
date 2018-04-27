@@ -82,12 +82,12 @@ def get_phase_change_data(name=None, formula=None, scn=None, database=None):
         raise FileNotFoundError
 
     if name is not None:
-        cursor.execute('SELECT MW, Tc, Pc, Acentric FROM PhaseChange WHERE Name=?', [name])
+        cursor.execute('SELECT MW, Tc, Pc, Acentric, Density FROM PhaseChange WHERE Name=?', [name])
     else:
         if formula is not None:
-            cursor.execute('SELECT MW, Tc, Pc, Acentric FROM PhaseChange WHERE Formula=?', [formula])
+            cursor.execute('SELECT MW, Tc, Pc, Acentric, Density FROM PhaseChange WHERE Formula=?', [formula])
         else:
-            cursor.execute('SELECT MW, Tc, Pc, Acentric FROM PhaseChange WHERE SCN=?', [scn])
+            cursor.execute('SELECT MW, Tc, Pc, Acentric, Density FROM PhaseChange WHERE SCN=?', [scn])
     constants = cursor.fetchall()
     close_database(cursor, conn)
 
