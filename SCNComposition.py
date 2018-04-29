@@ -6,10 +6,32 @@ import ReadFromFile as read
 import scipy.integrate as integrate
 import scipy.optimize as optimize
 import scipy.special as special
+import UnitConverter as units
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 runlog = logging.getLogger('runlog')
 alglog = logging.getLogger('alglog')
+
+
+def specific_gravity_c7plus(n, fractions):
+    M, gamma = list(), list()
+    for i in range(0, len(n)):
+        M.append(read.get_phase_change_data(scn=n[i])[0])
+        gamma.append(read.get_phase_change_data(scn=n[i])[4])
+
+    sumM = 0
+    for i in range(0, len(n)):
+        sumM += fractions[i] * M[i]
+
+    fraction7 = 0
+    for i in range(6, len(n)):
+        fraction7 += fractions[i] * M[i]
+
+    density = 0
+    for i in range(6, len(n)):
+        density += fractions[i] * M[i] / (fraction7 * gamma[i])
+
+    return 1 / density
 
 
 def MW_c7plus(n, fractions):
@@ -111,10 +133,10 @@ def watson_gamma(MW, kw):
     """
 
     return np.power(kw / (4.5579 * np.power(MW, 0.15178)), 0.84573)
-    
+
 
 def watson_boiling_pt(kw, SG):
-    return np.power(kw * SG, 3)
+    return units.to_si((kw * SG) ** 3, 'degR')
 
 
 def pdf_composition(n, alpha, beta, limits):
@@ -140,12 +162,12 @@ def pdf_regression(MW, fraction, n=None):
     return opt.x
 
 
-def gauss_lumping(tau, gamma, beta, order, z_c7p):
+def gauss_lumping(eta, gamma, beta, order, z_c7p):
     """
     Hydrocarbon lumping using Gauss-Laguerre Quadrature
 
-    :param tau: Minimum molecular weight
-    :type tau: float
+    :param eta: Minimum molecular weight
+    :type eta: float
     :param gamma: Fitting parameter
     :type gamma: float
     :param beta: Fitting parameter
@@ -156,20 +178,24 @@ def gauss_lumping(tau, gamma, beta, order, z_c7p):
     :type z_c7p: float
     :return: MW, Zi, and Z_c7+
     """
-    def molecular_weight(chi, tau, beta):
-        return chi * beta + tau
+    def molecular_weight(chi, eta, beta):
+        return chi * beta + eta
 
     def gl_fractions(chi, gamma):
         return np.power(chi, gamma - 1) / (special.gamma(gamma))
 
     chi, w = gauss_laguerre_quadrature_consts(order)
-    mw, fraction= list(), list()
-
+    mw, fraction, Tc, Tb, Pc, acentric = list(), list(), list(), list(), list(), list()
+    Pb = units.to_si(1, 'atm')
     for i in range(0, order):
-        mw.append(molecular_weight(chi[i], tau, beta))
+        mw.append(molecular_weight(chi[i], eta, beta))
         fraction.append(w[i] * gl_fractions(chi[i], gamma) * z_c7p)
+        Tc.append(sancet_Tc(mw[i]))
+        Tb.append(sancet_Tb(mw[i]))
+        Pc.append(sancet_Pc(mw[i]))
+        acentric.append(kessler_acentric(Tb[i] / Tc[i], Pbr=Pb / Pc[i]))
 
-    return np.array(mw), np.array(fraction), np.sum(np.array(fraction))
+    return np.array(mw), np.array(fraction), np.sum(np.array(fraction)), np.array(Tc), np.array(Pc), np.array(acentric)
 
 
 def gauss_laguerre_quadrature_consts(order):
@@ -201,3 +227,33 @@ def gauss_laguerre_quadrature_consts(order):
 
 def acentric(M):
     return -0.3 + np.exp(-6.252 + 3.64457 * np.power(M, 0.1))
+
+
+def sancet_Pc(M):
+    return units.to_si(82.82 + 653 * np.exp(-0.007427 * M), 'psi')
+
+
+def sancet_Tc(M):
+    return units.to_si(-778.5 + 383.5 * np.log(M - 4.075), 'degR')
+
+
+def sancet_Tb(M):
+    Tc = -778.5 + 383.5 * np.log(M - 4.075)
+    return units.to_si(194 + 0.001241 * np.power(Tc, 1.869), 'degR')
+
+
+def kessler_acentric(Tbr, Pbr=None, kw=None):
+    if kw is not None:
+        return -7.904 + 0.1352 * kw - 0.007465 * kw ** 2 + 8.359 * Tbr + (1.408 - 0.01063 * kw) / Tbr
+    if Pbr is not None:
+        f0 = np.log(Pbr) - 5.92714 / Tbr + 1.28862 * np.log(Tbr) - 0.169347 * Tbr ** 6
+        f1 = 15.2518 - 15.6875 / Tbr - 13.4721 * np.log(Tbr) + 0.43577 * Tbr ** 6
+        return f0 / f1
+    raise ValueError('Need Pbr or kw for Lee-Kesler Eccentric Factor')
+
+
+def kessler_Pc(kw, Tbr):
+    w = kessler_acentric(Tbr, kw=kw)
+    f1 = 5.92714 - 6.09648 / Tbr - 1.28862 * np.log(Tbr) + 0.169347 * Tbr ** 6
+    f2 = 15.2518 - 15.6875 / Tbr - 13.4721 * np.log(Tbr) + 0.43577 * Tbr ** 6
+    return units.to_si(1, 'atm') / np.exp(f1 + w * f2)

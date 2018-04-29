@@ -49,11 +49,21 @@ def RachfordRice(z, K, tolerance=1e-10):
         if not (poles > 1).any():
             nL = 1
         else:
-            nL = optimze.newton(rr_f, 0.5, args=(z, K, N), tol=tolerance)
-            if nL < 0:
-                nL = 0
-            if nL > 1:
+            rr0 = rr_f(0, z, K, N)
+            rr1 = rr_f(1, z, K, N)
+            print(rr0, rr1)
+
+            if rr1 >= 1:
                 nL = 1
+            else:
+                if rr0 <= 0:
+                    nL = 0
+                else:
+                    nL = optimze.newton(rr_f, 0, args=(z, K, N), tol=tolerance)
+                    if nL < 0:
+                        nL = 0.5
+                    if nL > 1:
+                        nL = 0.5
 
     x, y = list(), list()
     for i in range(0, N):
@@ -252,15 +262,15 @@ def volume(temp, press, z, temp_crit, press_crit, w, delta):
 
     vol = qr.cubic_root(a1, a2, a3)
 
-    vol = np.array(np.zeros(3))
+    volume = np.array(np.zeros(3))
     for i in range(0, 3):
         if np.iscomplex(vol[i]) or vol[i].real < b:
-            vol[i] = np.nan
+            volume[i] = np.nan
         else:
-            vol[i] = vol[i].real
+            volume[i] = vol[i].real
 
-    vol = np.sort(vol)
-    return vol
+    volume = np.sort(volume)
+    return volume
 
 
 def dPdV(temp, press, z, temp_crit, press_crit, w, delta):
