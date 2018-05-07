@@ -56,7 +56,8 @@ for i in range(0, 6):
 fraction7.append(zc7p)
 
 
-pdf_const = scn.pdf_regression(mw_raw[:5], fractions[:5])
+pdf_const = scn.pdf_regression(mw_raw[0:5], fractions[0:5])
+print(pdf_const)
 exp_const = scn.exp_regression(number[0:5], fractions[0:5], zc7p)
 # lbc_const = scn.lbc_regression(number[6:], fractions[6:], fractions[5])
 # ped_const = scn.pedersen_regression(number[:5], fractions[:5])
@@ -69,36 +70,53 @@ frac = list()
 for i in range(0, 6):
     frac.append(fractions[i])
 for i in range(6, 30):
-    # frac.append(scn.exp_compostion(i, *exp_const))
+    frac.append(scn.exp_compostion(i, *exp_const))
     # frac.append(scn.katz_composition(i, zc7p))
-    frac.append(scn.lbc_compostion(i, fractions[5], -0.00873587, -0.00987387))
+    # frac.append(scn.lbc_compostion(i, fractions[5], -0.00873587, -0.00987387))
 
 
 def error(x):
     return (x[0] - x[1]) ** 2 / (x[0] * x[1])
 
-print(frac)
-print(len(frac))
+
+gl3 = scn.gauss_lumping(mw30[0], *pdf_const, 3, zc7p)
+gl4 = scn.gauss_lumping(mw30[0], *pdf_const, 4, zc7p)
+print(gl3)
+
+ngl = number[0:6]
+for i in range(0, 3):
+    ngl = np.append(ngl, None)
+delta = read.get_binary_interations(ngl)
+
 
 ### Bubble Point Calculation
 T = units.to_si(220, 'degF')
-P = units.to_si(12.952, 'MPa')    # LBC
+P = units.to_si(12.2, 'MPa')    # Gauss-Laguerre 3rd Order
+# P = units.to_si(12.952, 'MPa')    # LBC
 # P = units.to_si(12.2501, 'MPa') # Katz
 # P = units.to_si(1.2763e7, 'Pa') # Exponential
 # P = units.to_si(1.31998e7, 'Pa')# Exact
 Tc, Pc, w, g = list(), list(), list(), list()
-for n in range(0, len(n30)):
+for n in range(0, 30):
     Tc.append(read.get_phase_change_data(scn=n30[n])[1])
     Pc.append(units.to_si(read.get_phase_change_data(scn=n30[n])[2], 'MPa'))
     w.append(read.get_phase_change_data(scn=n30[n])[3])
     g.append(read.get_phase_change_data(scn=n30[n])[4])
+# for n in range(6, 9):
+#     frac.append(gl3[1][n - 6])
+#     w.append(gl3[5][n - 6])
+#     Tc.append(gl3[3][n - 6])
+#     Pc.append(gl3[4][n - 6])
+
+print(w)
+
 
 # temp, press, z, temp_crit, press_crit, w, delta=None, tolerance=1e-10
-# print(str(multi.flash(T, P, frac, Tc, Pc, w, delta30)[2]))
-print(error([12.952, 13.1998]))
-print(error([12.2501, 13.1998]))
-print(error([12.763, 13.1998]))
-# sys.exit()
+print(str(multi.flash(T, P, frac, Tc, Pc, w, delta30)[2]))
+# print(error([12.952, 13.1998]))
+# print(error([12.2501, 13.1998]))
+# print(error([12.763, 13.1998]))
+sys.exit()
 
 kw = scn.watson_factor(Mc7p, gc7p)
 Tb = scn.watson_boiling_pt(kw, gc7p)
@@ -130,14 +148,14 @@ for i in range(1, 30):
 z_pdf = list()
 for i in range(0, 300):
     z_pdf.append((scn.pdf_whitson(o[i], mw_raw[0], *pdf_const)))
-#
-# plt.figure()
-# plt.plot(o, z_pdf, 'k', label=r'$\alpha = {0}$, $\beta ={1}$'.format(np.round(pdf_const[0], 4), np.round(pdf_const[1], 4)))
-# plt.yscale('log')
-# plt.xlabel('Molecular Weight')
-# plt.ylabel(r'Probability Density Function, $\rho(M)$')
-# plt.legend()
-# plt.show()
+
+plt.figure()
+plt.plot(o, z_pdf, 'k', label=r'$\alpha = {0}$, $\beta ={1}$'.format(np.round(pdf_const[0], 4), np.round(pdf_const[1], 4)))
+plt.yscale('log')
+plt.xlabel('Molecular Weight')
+plt.ylabel(r'Probability Density Function, $\rho(M)$')
+plt.legend()
+plt.show()
 
 xi3, w3 = scn.gauss_laguerre_quadrature_consts(3)
 xi4, w4 = scn.gauss_laguerre_quadrature_consts(4)
@@ -152,11 +170,11 @@ for i in range(0, 3):
 
 for i in range(0, 4):
     print(mw_gauss(xi4[i], mw30[6], pdf_const[1]), w4[i])
-sys.exit()
+# sys.exit()
 # print(np.sum(np.array(z_pdf[z:])))
 
 n = np.linspace(1, 30, 300)
-z_exp = scn.exp_compostion(n, *exp_const)
+# z_exp = scn.exp_compostion(n, *exp_const)
 z_lbc = scn.lbc_compostion(n, fractions[5], -0.00873587, -0.00987387)
 z_katz = scn.katz_composition(n, zc7p)
 # # z_ped = scn.pedersen_composition(n, *ped_const)
@@ -164,7 +182,7 @@ z_katz = scn.katz_composition(n, zc7p)
 plt.figure()
 ax = plt.axes()
 plt.bar(number, fractions)
-plt.plot(n, z_exp, ':', label='Exponential')
+# plt.plot(n, z_exp, ':', label='Exponential')
 plt.plot(n, z_lbc, '-.', label='Lorenz-Bray-Clark')
 plt.plot(n, z_katz, '--', label='Katz')
 plt.plot(m, z_frac, 'k', label='Whitson')

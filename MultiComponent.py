@@ -53,13 +53,13 @@ def RachfordRice(z, K, tolerance=1e-10):
             rr1 = rr_f(1, z, K, N)
             print(rr0, rr1)
 
-            if rr1 >= 1:
+            if rr1 > 0:
                 nL = 1
             else:
                 if rr0 <= 0:
                     nL = 0
                 else:
-                    nL = optimze.newton(rr_f, 0, args=(z, K, N), tol=tolerance)
+                    nL = optimze.newton(rr_f, 0.5, args=(z, K, N), tol=tolerance)
                     if nL < 0:
                         nL = 0.5
                     if nL > 1:

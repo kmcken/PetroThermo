@@ -130,16 +130,19 @@ def get_binary_interations(scn_list=None, database=None):
     N = len(scn_list)
     delta = np.array(np.zeros((N, N)))
     for i in range(0, N):
-        cursor.execute('SELECT * FROM BinaryInteractions WHERE SCN=?', [scn_list[i]])
-        binary = cursor.fetchall()[0]
+        if scn_list[i] is None:
+            binary = np.zeros(N)
+        else:
+            cursor.execute('SELECT * FROM BinaryInteractions WHERE SCN=?', [scn_list[i]])
+            binary = cursor.fetchall()[0]
         for j in range(0, N):
             if j > 8:
                 delta[i][j] = 0
                 continue
-            if binary[j + 1] is None:
+            if binary[j] is None:
                 delta[i][j] = 0.
             else:
-                delta[i][j] = binary[j + 1]
+                delta[i][j] = binary[j]
 
     close_database(cursor, conn)
     return delta
